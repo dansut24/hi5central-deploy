@@ -111,6 +111,7 @@ services:
       API_URL: ${API_URL}
       PORTAL_URL: ${PORTAL_URL}
       RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
       MARKETING_URL: ${MARKETING_URL}
       DOWNLOADS_URL: ${DOWNLOADS_URL}
       TURN_URL: ${TURN_URL}
@@ -137,6 +138,7 @@ services:
       API_URL: ${API_URL}
       PORTAL_URL: ${PORTAL_URL}
       RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
       DOWNLOADS_URL: ${DOWNLOADS_URL}
       TURN_URL: ${TURN_URL}
     networks: [hi5internal]
@@ -162,6 +164,7 @@ services:
       API_URL: ${API_URL}
       PORTAL_URL: ${PORTAL_URL}
       RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
       DOWNLOADS_URL: ${DOWNLOADS_URL}
       TURN_URL: ${TURN_URL}
     networks: [hi5internal]
