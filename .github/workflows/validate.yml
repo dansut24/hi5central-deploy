@@ -21,11 +21,13 @@ jobs:
           REDIS_PASSWORD=$(openssl rand -hex 18)
           MFA_KEY=$(openssl rand -hex 32)
           RMM_KEY=$(openssl rand -hex 32)
+          CONNECT_KEY=$(openssl rand -hex 32)
           TURN_SECRET=$(openssl rand -hex 32)
           sed -i "s/POSTGRES_PASSWORD=CHANGE_ME/POSTGRES_PASSWORD=$PG_PASSWORD/" .env
           sed -i "s/REDIS_PASSWORD=CHANGE_ME/REDIS_PASSWORD=$REDIS_PASSWORD/" .env
           sed -i "s/MFA_ENCRYPTION_KEY=64_HEX_CHARACTERS/MFA_ENCRYPTION_KEY=$MFA_KEY/" .env
           sed -i "s/RMM_RECOVERY_KEY_ENCRYPTION_KEY=64_HEX_CHARACTERS/RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY/" .env
+          sed -i "s/CONNECT_CODE_HMAC_KEY=64_HEX_CHARACTERS/CONNECT_CODE_HMAC_KEY=$CONNECT_KEY/" .env
           mkdir -p secrets
           printf '%s' "$TURN_SECRET" > secrets/turn_shared_secret
           cat > secrets/turnserver.conf <<TURN
