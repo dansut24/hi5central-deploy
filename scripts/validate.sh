@@ -15,9 +15,11 @@ fi
 
 MFA=$(awk -F= '$1=="MFA_ENCRYPTION_KEY"{print substr($0,index($0,"=")+1)}' .env | tail -1)
 RMM=$(awk -F= '$1=="RMM_RECOVERY_KEY_ENCRYPTION_KEY"{print substr($0,index($0,"=")+1)}' .env | tail -1)
+CONNECT=$(awk -F= '$1=="CONNECT_CODE_HMAC_KEY"{print substr($0,index($0,"=")+1)}' .env | tail -1)
 
 echo "$MFA" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "MFA_ENCRYPTION_KEY must be 64 hex characters." >&2; exit 1; }
 echo "$RMM" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "RMM_RECOVERY_KEY_ENCRYPTION_KEY must be 64 hex characters." >&2; exit 1; }
+echo "$CONNECT" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "CONNECT_CODE_HMAC_KEY must be 64 hex characters." >&2; exit 1; }
 
 docker compose config -q
 echo "Hi5Central deployment configuration is valid."
