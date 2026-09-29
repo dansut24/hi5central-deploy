@@ -15,6 +15,7 @@ PG_PASSWORD=$(random_hex 18)
 REDIS_PASSWORD=$(random_hex 18)
 MFA_KEY=$(random_hex 32)
 RMM_KEY=$(random_hex 32)
+CONNECT_KEY=$(random_hex 32)
 trap 'docker compose -p "$PROJECT" --env-file "$ENV_FILE" down -v --remove-orphans >/dev/null 2>&1 || true; rm -f "$ENV_FILE"' EXIT INT TERM
 
 cat >"$ENV_FILE" <<EOF
@@ -31,7 +32,7 @@ REDIS_PASSWORD=$REDIS_PASSWORD
 
 MFA_ENCRYPTION_KEY=$MFA_KEY
 RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY
-CONNECT_CODE_HMAC_KEY=
+CONNECT_CODE_HMAC_KEY=$CONNECT_KEY
 
 APP_URL=http://itsm.split.localhost
 PORTAL_URL=http://itsm.split.localhost/portal
