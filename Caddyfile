@@ -1,0 +1,25 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$API_ADDRESS} {
+  reverse_proxy control-server:3001
+}
+
+{$ITSM_ADDRESS} {
+  reverse_proxy itsm-web:80
+}
+
+{$RMM_ADDRESS} {
+  reverse_proxy rmm-web:80
+}
+
+{$ADMIN_ADDRESS} {
+  reverse_proxy admin-web:80
+}
+
+{$DOWNLOADS_ADDRESS} {
+  root * /srv/downloads
+  file_server
+  header Cache-Control "public, max-age=300"
+}

@@ -1,0 +1,220 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hi5central}
+      POSTGRES_USER: ${POSTGRES_USER:-hi5central}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hi5central} -d ${POSTGRES_DB:-hi5central}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  migrate:
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
+    command: ["npm", "run", "migrate"]
+    networks: [hi5internal]
+
+  control-server:
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      MARKETING_URL: ${MARKETING_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
+      RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
+      CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-}
+      TURN_HOST: ${TURN_HOST:-turn}
+      TURN_SHARED_SECRET_FILE: /run/secrets/turn_shared_secret
+      APP_PORTAL_PACKAGE_DIR: /srv/app-portal-packages
+      SELF_HOST_EVALUATION_PRODUCTS: ${SELF_HOST_EVALUATION_PRODUCTS:-itsm,rmm}
+      SELF_HOST_EVALUATION_USER_LIMIT: ${SELF_HOST_EVALUATION_USER_LIMIT:-10}
+      SELF_HOST_EVALUATION_DEVICE_LIMIT: ${SELF_HOST_EVALUATION_DEVICE_LIMIT:-25}
+    volumes:
+      - app_portal_packages:/srv/app-portal-packages
+      - ./secrets/turn_shared_secret:/run/secrets/turn_shared_secret:ro
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+
+  itsm-web:
+    profiles: ["itsm"]
+    image: ${ITSM_IMAGE:-ghcr.io/dansut24/hi5central-itsm:latest}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      MARKETING_URL: ${MARKETING_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  rmm-web:
+    profiles: ["rmm"]
+    image: ${RMM_IMAGE:-ghcr.io/dansut24/hi5central-rmm:latest}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  admin-web:
+    profiles: ["admin"]
+    image: ${ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-admin:latest}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  turn:
+    profiles: ["rmm"]
+    image: coturn/coturn:4.6.3
+    restart: unless-stopped
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    ports:
+      - "3478:3478/tcp"
+      - "3478:3478/udp"
+      - "49160-49200:49160-49200/udp"
+    volumes:
+      - ./secrets/turnserver.conf:/etc/coturn/turnserver.conf:ro
+    networks: [hi5internal]
+
+  gateway:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      ITSM_ADDRESS: ${ITSM_ADDRESS}
+      RMM_ADDRESS: ${RMM_ADDRESS}
+      ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      API_ADDRESS: ${API_ADDRESS}
+      DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - downloads:/srv/downloads:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [hi5internal]
+
+networks:
+  hi5internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+  downloads:
+  app_portal_packages:
