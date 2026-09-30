@@ -38,7 +38,13 @@ jobs:
           ./install.sh --http --configure-only --force
           docker compose config --services | grep -qx admin-web
           ! docker compose config --services | grep -qx docs-web
-      - name: Validate managed Dev and Prod profiles
+      - name: Validate managed Dev, Test, UAT and Live profiles
         run: |
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/dev.env.example config --services | grep -qx docs-web
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config --services | grep -qx admin-web
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config --services | grep -qx admin-web
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config --services | grep -qx docs-web
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/dev.env.example config | grep -q 'RUNTIME_ENVIRONMENT: dev'
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config | grep -q 'RUNTIME_ENVIRONMENT: test'
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config | grep -q 'RUNTIME_ENVIRONMENT: uat'
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config | grep -q 'RUNTIME_ENVIRONMENT: live'

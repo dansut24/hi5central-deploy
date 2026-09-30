@@ -52,6 +52,8 @@ COMPOSE_PROFILES=$PROFILES
 COMPOSE_PROJECT_NAME=$PROJECT
 DEPLOYMENT_MODE=self_hosted
 SELF_HOST_EDITION=$EDITION
+RUNTIME_ENVIRONMENT=live
+FEATURE_MODE=controlled
 TENANCY_MODE=single
 ROOT_DOMAIN=split.localhost
 PRIMARY_TENANT_SLUG=local
@@ -90,8 +92,8 @@ ACME_EMAIL=
 GATEWAY_HTTP_PORT=127.0.0.1:18180
 GATEWAY_HTTPS_PORT=127.0.0.1:18480
 TURN_LISTEN_PORT=3489
-TURN_RELAY_MIN_PORT=49360
-TURN_RELAY_MAX_PORT=49400
+TURN_RELAY_MIN_PORT=49860
+TURN_RELAY_MAX_PORT=49900
 
 CONTROL_SERVER_IMAGE=$CONTROL_IMAGE
 ITSM_IMAGE=$ITSM_IMAGE
@@ -115,7 +117,9 @@ else
   printf '%s\n' "$services" | grep -qx admin-web
 fi
 
-compose pull
+if [ "${HI5_SMOKE_SKIP_PULL:-0}" != "1" ]; then
+  compose pull
+fi
 compose up -d --remove-orphans
 
 wait_healthy() {
@@ -164,7 +168,7 @@ gateway=$(compose ps -q gateway)
 docker exec "$gateway" wget --header='Host: itsm.split.localhost' -qO- http://127.0.0.1/ | grep -Fq 'Hi5Central'
 docker exec "$gateway" wget --header='Host: api.split.localhost' -qO- http://127.0.0.1/live >/dev/null
 
-tables=$(compose exec -T postgres sh -lc 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select count(*) from information_schema.tables where table_schema=current_schema();"')
+tables=$(compose exec -T postgres psql -U hi5central -d hi5central -Atc "select count(*) from information_schema.tables where table_schema=current_schema();")
 [ "$tables" -ge 120 ]
 
 echo "Hi5Central $EDITION self-host smoke test passed ($tables public tables)."

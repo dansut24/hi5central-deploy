@@ -172,57 +172,84 @@ Managed environment templates live under:
 
 ~~~text
 environments/dev.env.example
+environments/test.env.example
+environments/uat.env.example
 environments/prod.env.example
 ~~~
 
-Create the private runtime files as:
+The four environments have deliberately different responsibilities:
 
-~~~sh
-cp environments/dev.env.example environments/dev.env
-cp environments/prod.env.example environments/prod.env
-~~~
+| Environment | Feature mode | Data | Image policy |
+| --- | --- | --- | --- |
+| Dev | all enabled | development | follows `:dev` |
+| Test | all enabled | disposable test data | follows `:dev`; resettable |
+| UAT | controlled | release-cycle test data | exact Test image digests |
+| Live | controlled | production | exact UAT-tested image digests |
 
-The real environment files are ignored by Git.
+Create private runtime files from the templates and replace all placeholder secrets before startup. Real environment files are ignored by Git.
 
 Use:
 
 ~~~sh
-./scripts/environment.sh dev config
 ./scripts/environment.sh dev up
-./scripts/environment.sh dev update
-./scripts/environment.sh dev ps
-
-./scripts/environment.sh prod config
+./scripts/environment.sh test up
+./scripts/environment.sh uat up
 ./scripts/environment.sh prod update
 ~~~
 
-Dev and Prod use different COMPOSE_PROJECT_NAME values, so their PostgreSQL, Redis, application volumes, networks and containers are independent.
+Every environment uses a different `COMPOSE_PROJECT_NAME`, PostgreSQL/Redis volume set, private Docker network, gateway name and host/TURN port range.
 
-Managed environments also load `compose.managed-edge.yml`. This joins only the managed gateway to the existing edge Docker network while application, PostgreSQL and Redis services remain isolated on the environment's private network. Set `EDGE_NETWORK` and a unique `MANAGED_GATEWAY_CONTAINER_NAME` in each managed environment file.
+Managed environments also load `compose.managed-edge.yml`. This joins only the managed gateway to the existing edge Docker network while application, PostgreSQL and Redis services remain isolated on the environment's private network.
 
-For the current Hi5Central VPS design, Dev is exposed by the existing edge proxy using dedicated `dev-*` hostnames. The Dev gateway still binds its host HTTP/HTTPS ports to loopback; the public edge reaches it over the shared Docker edge network instead of exposing Dev directly on host ports 80/443 or sharing production cookies.
-
-### Promotion model
+### Release and promotion model
 
 ~~~text
 feature work
     ↓
-develop
+develop / :dev
     ↓
-CI + :dev images
+Dev integration
     ↓
-isolated Dev environment
+Test — all registered features ON
+    │     disposable data / Reset button
+    │
+    ├── Test result: Pass / Fail / Blocked
     ↓
-tested/approved
+select passed changes
     ↓
-merge to main
+UAT — controlled feature switches
+    │     exact Test image digests
+    │
+    ├── UAT result: Pass / Fail / Blocked
     ↓
-CI + :prod image
+tick UAT-passed feature-gated changes
     ↓
-production deployment
+Push selected to Live
+    ↓
+Live — exact UAT image digests + selected flags ON
 ~~~
 
-Production is never updated from an untested develop image.
+Release changes, test evidence, feature switches and promotion requests are stored in the managed Platform Admin control plane. Test must pass before UAT evidence is accepted. UAT must pass before a change can be selected for Live.
+
+Selective Live promotion requires a registered feature flag. This is intentional: an unselected change may exist inside the same immutable candidate image, but it remains dormant until its Live feature switch is explicitly promoted.
+
+The Hono API never receives the Docker socket. It only queues validated environment actions. A separate Hi5Central Release Operator claims those actions, resets the disposable Test project, captures exact registry digests from Test/UAT and deploys the target environment. Live execution is additionally blocked unless the operator is started with `LIVE_PROMOTION_ENABLED=1`.
+
+Install the operator against the current managed control plane with:
+
+~~~sh
+./scripts/install-release-operator.sh dev
+~~~
+
+After the new managed Live control plane is cut over, reinstall it against Live with:
+
+~~~sh
+./scripts/install-release-operator.sh prod
+~~~
+
+The installer copies `test.env`, `uat.env`, the optional `prod.env`, and the operator credential into a dedicated Docker volume with restrictive permissions. The operator container alone receives the Docker socket. Before cutover, Live promotion remains disabled. At the controlled cutover, use `HI5_ENABLE_LIVE_PROMOTION=1` when reinstalling the operator.
+
+Production is never updated directly from a mutable `:dev` image.
 
 ## Preflight
 

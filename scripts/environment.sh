@@ -7,13 +7,13 @@ cd "$ROOT_DIR"
 ENVIRONMENT=${1:-}
 ACTION=${2:-}
 case "$ENVIRONMENT" in
-  dev|prod) ;;
-  *) echo "Usage: ./scripts/environment.sh <dev|prod> <config|up|update|down|ps>" >&2; exit 2 ;;
+  dev|test|uat|prod) ;;
+  *) echo "Usage: ./scripts/environment.sh <dev|test|uat|prod> <config|up|update|down|ps>" >&2; exit 2 ;;
 esac
 
 case "$ACTION" in
   config|up|update|down|ps) ;;
-  *) echo "Usage: ./scripts/environment.sh <dev|prod> <config|up|update|down|ps>" >&2; exit 2 ;;
+  *) echo "Usage: ./scripts/environment.sh <dev|test|uat|prod> <config|up|update|down|ps>" >&2; exit 2 ;;
 esac
 
 ENV_FILE="environments/$ENVIRONMENT.env"
