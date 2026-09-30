@@ -4,15 +4,21 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
-[ -f .env ] || { echo "Missing .env. Run ./install.sh or copy .env.example." >&2; exit 1; }
+ENV_FILE=.env
+if [ "${1:-}" = "--env-file" ]; then
+  ENV_FILE=${2:?--env-file requires a path}
+  shift 2
+fi
 
-if grep -Eq '(^|=)(CHANGE_ME|64_HEX_CHARACTERS)$' .env; then
-  echo "Placeholder secrets remain in .env." >&2
+[ -f "$ENV_FILE" ] || { echo "Missing $ENV_FILE. Run ./install.sh or copy the matching example file." >&2; exit 1; }
+
+if grep -Eq '(^|=)(CHANGE_ME|64_HEX_CHARACTERS)$' "$ENV_FILE"; then
+  echo "Placeholder secrets remain in $ENV_FILE." >&2
   exit 1
 fi
 
 read_env() {
-  awk -F= -v key="$1" '$1==key{print substr($0,index($0,"=")+1)}' .env | tail -1
+  awk -F= -v key="$1" '$1==key{print substr($0,index($0,"=")+1)}' "$ENV_FILE" | tail -1
 }
 
 MFA=$(read_env MFA_ENCRYPTION_KEY)
@@ -31,5 +37,5 @@ echo "$TURN" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "TURN_SHARED_SECRET must b
 [ "${#REDIS}" -ge 24 ] || { echo "REDIS_PASSWORD must be at least 24 characters." >&2; exit 1; }
 [ -n "$ROOT_DOMAIN" ] || { echo "ROOT_DOMAIN is required." >&2; exit 1; }
 
-docker compose config -q
-echo "Hi5Central deployment configuration is valid."
+docker compose --env-file "$ENV_FILE" config -q
+echo "Hi5Central deployment configuration is valid ($ENV_FILE)."

@@ -42,6 +42,7 @@ services:
       ITSM_ADDRESS: ${ITSM_ADDRESS}
       RMM_ADDRESS: ${RMM_ADDRESS}
       ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
       API_ADDRESS: ${API_ADDRESS}
       DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
     command:
@@ -83,11 +84,25 @@ services:
         $$RMM_ADDRESS {
           reverse_proxy rmm-web:80
         }
+        EOF
 
+        if [ -n "$$ADMIN_ADDRESS" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
         $$ADMIN_ADDRESS {
           reverse_proxy admin-web:80
         }
+        EOF
+        fi
 
+        if [ -n "$$HELP_ADDRESS" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$HELP_ADDRESS {
+          reverse_proxy docs-web:80
+        }
+        EOF
+        fi
+
+        cat >> /gateway-config/Caddyfile <<EOF
         $$DOWNLOADS_ADDRESS {
           root * /srv/downloads
           file_server
@@ -114,7 +129,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
-    command: ["npm", "run", "migrate"]
+    command: ["npm", "run", "migrate:dist"]
     networks: [hi5internal]
 
   control-server:
@@ -134,6 +149,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
@@ -160,9 +176,11 @@ services:
       TURN_HOST: ${TURN_HOST:-turn}
       TURN_SHARED_SECRET_FILE: /run/secrets/turn_shared_secret
       APP_PORTAL_PACKAGE_DIR: /srv/app-portal-packages
-      SELF_HOST_EVALUATION_PRODUCTS: ${SELF_HOST_EVALUATION_PRODUCTS:-itsm,rmm}
-      SELF_HOST_EVALUATION_USER_LIMIT: ${SELF_HOST_EVALUATION_USER_LIMIT:-10}
-      SELF_HOST_EVALUATION_DEVICE_LIMIT: ${SELF_HOST_EVALUATION_DEVICE_LIMIT:-25}
+      LICENSING_SERVER_URL: ${LICENSING_SERVER_URL:-https://licensing.hi5central.com}
+      LICENSING_PUBLIC_KEY_PEM: ${LICENSING_PUBLIC_KEY_PEM:-}
+      LICENSING_PRIVATE_KEY_PEM: ${LICENSING_PRIVATE_KEY_PEM:-}
+      LICENSING_REFRESH_INTERVAL_MS: ${LICENSING_REFRESH_INTERVAL_MS:-43200000}
+      LICENSING_INITIAL_REFRESH_DELAY_MS: ${LICENSING_INITIAL_REFRESH_DELAY_MS:-30000}
     volumes:
       - app_portal_packages:/srv/app-portal-packages
       - runtime_secrets:/run/secrets:ro
@@ -183,6 +201,7 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
@@ -210,6 +229,7 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
@@ -236,6 +256,7 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
@@ -246,6 +267,17 @@ services:
       ADMIN_URL: ${ADMIN_URL:-}
       DOWNLOADS_URL: ${DOWNLOADS_URL}
       TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  docs-web:
+    profiles: ["docs"]
+    image: ${DOCS_IMAGE:-ghcr.io/dansut24/hi5central-docs:latest}
+    restart: unless-stopped
     networks: [hi5internal]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
@@ -281,6 +313,7 @@ services:
       ITSM_ADDRESS: ${ITSM_ADDRESS}
       RMM_ADDRESS: ${RMM_ADDRESS}
       ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
       API_ADDRESS: ${API_ADDRESS}
       DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
       ACME_EMAIL: ${ACME_EMAIL:-}
