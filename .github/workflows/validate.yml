@@ -14,32 +14,13 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Prepare CI environment
-        run: |
-          cp .env.example .env
-          PG_PASSWORD=$(openssl rand -hex 18)
-          REDIS_PASSWORD=$(openssl rand -hex 18)
-          MFA_KEY=$(openssl rand -hex 32)
-          RMM_KEY=$(openssl rand -hex 32)
-          CONNECT_KEY=$(openssl rand -hex 32)
-          TURN_SECRET=$(openssl rand -hex 32)
-          sed -i "s/POSTGRES_PASSWORD=CHANGE_ME/POSTGRES_PASSWORD=$PG_PASSWORD/" .env
-          sed -i "s/REDIS_PASSWORD=CHANGE_ME/REDIS_PASSWORD=$REDIS_PASSWORD/" .env
-          sed -i "s/MFA_ENCRYPTION_KEY=64_HEX_CHARACTERS/MFA_ENCRYPTION_KEY=$MFA_KEY/" .env
-          sed -i "s/RMM_RECOVERY_KEY_ENCRYPTION_KEY=64_HEX_CHARACTERS/RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY/" .env
-          sed -i "s/CONNECT_CODE_HMAC_KEY=64_HEX_CHARACTERS/CONNECT_CODE_HMAC_KEY=$CONNECT_KEY/" .env
-          mkdir -p secrets
-          printf '%s' "$TURN_SECRET" > secrets/turn_shared_secret
-          cat > secrets/turnserver.conf <<TURN
-          listening-port=3478
-          fingerprint
-          use-auth-secret
-          static-auth-secret=$TURN_SECRET
-          realm=example.internal
-          min-port=49160
-          max-port=49200
-          TURN
-      - name: Validate Compose
-        run: ./scripts/validate.sh
+      - name: Check installer shell syntax
+        run: sh -n install.sh scripts/*.sh
+      - name: Validate one-run bootstrap configuration
+        env:
+          HI5_ROOT_DOMAIN: ci.localhost
+          HI5_PRODUCTS: itsm,rmm,admin
+          HI5_SCHEME: http
+        run: ./install.sh --http --configure-only --force
       - name: Show enabled services
         run: docker compose config --services
