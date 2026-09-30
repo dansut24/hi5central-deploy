@@ -1,0 +1,11 @@
+services:
+  gateway:
+    container_name: ${RELEASE_GATEWAY_CONTAINER_NAME:-hi5central-release-gateway}
+    networks:
+      - hi5internal
+      - release_edge
+
+networks:
+  release_edge:
+    external: true
+    name: ${RELEASE_EDGE_NETWORK:-hi5central-release-edge}

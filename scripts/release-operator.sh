@@ -6,7 +6,7 @@ TOKEN_FILE=${RELEASE_OPERATOR_TOKEN_FILE:-/config/operator.token}
 LIVE_PROMOTION_ENABLED=${LIVE_PROMOTION_ENABLED:-0}
 POLL_SECONDS=${RELEASE_OPERATOR_POLL_SECONDS:-10}
 COMPOSE_FILE=/operator/compose.yml
-EDGE_FILE=/operator/compose.managed-edge.yml
+EDGE_FILE=/operator/compose.release-edge.yml
 
 [ -s "$TOKEN_FILE" ] || { echo "Missing release operator token file: $TOKEN_FILE" >&2; exit 1; }
 TOKEN=$(cat "$TOKEN_FILE")

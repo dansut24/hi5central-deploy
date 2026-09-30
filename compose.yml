@@ -45,6 +45,10 @@ services:
       HELP_ADDRESS: ${HELP_ADDRESS:-}
       API_ADDRESS: ${API_ADDRESS}
       DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+      RELEASE_TEST_ADDRESSES: ${RELEASE_TEST_ADDRESSES:-}
+      RELEASE_TEST_GATEWAY_UPSTREAM: ${RELEASE_TEST_GATEWAY_UPSTREAM:-}
+      RELEASE_UAT_ADDRESSES: ${RELEASE_UAT_ADDRESSES:-}
+      RELEASE_UAT_GATEWAY_UPSTREAM: ${RELEASE_UAT_GATEWAY_UPSTREAM:-}
     command:
       - /bin/sh
       - -ec
@@ -98,6 +102,22 @@ services:
           cat >> /gateway-config/Caddyfile <<EOF
         $$HELP_ADDRESS {
           reverse_proxy docs-web:80
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_TEST_ADDRESSES" ] && [ -n "$$RELEASE_TEST_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_TEST_ADDRESSES {
+          reverse_proxy $$RELEASE_TEST_GATEWAY_UPSTREAM
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_UAT_ADDRESSES" ] && [ -n "$$RELEASE_UAT_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_UAT_ADDRESSES {
+          reverse_proxy $$RELEASE_UAT_GATEWAY_UPSTREAM
         }
         EOF
         fi

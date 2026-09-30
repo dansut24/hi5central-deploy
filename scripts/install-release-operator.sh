@@ -5,9 +5,12 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT_DIR"
 
 CONTROL_ENV=${1:-prod}
-case "$CONTROL_ENV" in dev|prod) ;; *) echo "Usage: $0 <dev|prod>" >&2; exit 2 ;; esac
+case "$CONTROL_ENV" in
+  dev|prod) CONTROL_FILE="environments/$CONTROL_ENV.env" ;;
+  selfhost) CONTROL_FILE=".env" ;;
+  *) echo "Usage: $0 <dev|prod|selfhost>" >&2; exit 2 ;;
+esac
 
-CONTROL_FILE="environments/$CONTROL_ENV.env"
 [ -s "$CONTROL_FILE" ] || { echo "Missing $CONTROL_FILE." >&2; exit 1; }
 [ -s environments/test.env ] || { echo "Missing environments/test.env." >&2; exit 1; }
 [ -s environments/uat.env ] || { echo "Missing environments/uat.env." >&2; exit 1; }
@@ -40,9 +43,12 @@ trap 'rm -rf "$WORK"' EXIT INT TERM
 umask 077
 cp environments/test.env "$WORK/test.env"
 cp environments/uat.env "$WORK/uat.env"
-if [ -s environments/prod.env ]; then
+if [ "$CONTROL_ENV" = selfhost ]; then
+  cp .env "$WORK/live.env"
+elif [ -s environments/prod.env ]; then
   cp environments/prod.env "$WORK/live.env"
 fi
+[ -s "$WORK/live.env" ] || { echo "A Live environment file is required by the release operator." >&2; exit 1; }
 printf '%s' "$TOKEN" > "$WORK/operator.token"
 chmod 600 "$WORK"/*
 
