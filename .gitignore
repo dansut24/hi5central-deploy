@@ -1,5 +1,6 @@
 .env
 environments/*.env
+environments/*.credentials
 secrets/*
 !secrets/.gitkeep
 data/

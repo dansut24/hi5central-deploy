@@ -40,5 +40,5 @@ jobs:
           ! docker compose config --services | grep -qx docs-web
       - name: Validate managed Dev and Prod profiles
         run: |
-          docker compose --env-file environments/dev.env.example config --services | grep -qx docs-web
-          docker compose --env-file environments/prod.env.example config --services | grep -qx docs-web
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/dev.env.example config --services | grep -qx docs-web
+          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config --services | grep -qx docs-web

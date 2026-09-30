@@ -198,7 +198,9 @@ Use:
 
 Dev and Prod use different COMPOSE_PROJECT_NAME values, so their PostgreSQL, Redis, application volumes, networks and containers are independent.
 
-For the current Hi5Central VPS design, Dev should be exposed by the existing edge proxy using dedicated dev-* hostnames rather than sharing production cookies or directly owning host ports 80/443.
+Managed environments also load `compose.managed-edge.yml`. This joins only the managed gateway to the existing edge Docker network while application, PostgreSQL and Redis services remain isolated on the environment's private network. Set `EDGE_NETWORK` and a unique `MANAGED_GATEWAY_CONTAINER_NAME` in each managed environment file.
+
+For the current Hi5Central VPS design, Dev is exposed by the existing edge proxy using dedicated `dev-*` hostnames. The Dev gateway still binds its host HTTP/HTTPS ports to loopback; the public edge reaches it over the shared Docker edge network instead of exposing Dev directly on host ports 80/443 or sharing production cookies.
 
 ### Promotion model
 

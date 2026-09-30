@@ -23,7 +23,7 @@ ENV_FILE="environments/$ENVIRONMENT.env"
 }
 
 compose() {
-  docker compose --env-file "$ENV_FILE" "$@"
+  docker compose -f compose.yml -f compose.managed-edge.yml --env-file "$ENV_FILE" "$@"
 }
 case "$ACTION" in
   config)

@@ -1,0 +1,11 @@
+services:
+  gateway:
+    container_name: ${MANAGED_GATEWAY_CONTAINER_NAME:-hi5central-managed-gateway}
+    networks:
+      - hi5internal
+      - managed_edge
+
+networks:
+  managed_edge:
+    external: true
+    name: ${EDGE_NETWORK:-hi5central}
