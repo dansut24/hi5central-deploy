@@ -32,7 +32,7 @@ The installer:
 1. validates Docker/Compose;
 2. generates PostgreSQL and Redis credentials;
 3. generates the MFA, RMM recovery and Connect encryption/HMAC keys;
-4. generates the coturn shared secret and configuration;
+4. generates the coturn shared secret and Docker-managed Caddy/TURN runtime configuration;
 5. writes a locked-down `.env`;
 6. validates the full Compose configuration;
 7. pulls the configured Hi5Central images;
@@ -93,7 +93,7 @@ The gateway and TURN host ports can be overridden with `GATEWAY_HTTP_PORT`, `GAT
 - `./scripts/down.sh` stops the stack without deleting persistent volumes.
 - `./scripts/validate.sh` validates secrets and the Compose model.
 
-Back up `.env`, `secrets/` and Docker volumes before upgrades.
+Back up `.env` and the persistent Docker volumes before upgrades. Caddy/TURN runtime configuration is regenerated into Docker-managed volumes and does not require host-file bind mounts.
 
 ## Disposable integration smoke test
 

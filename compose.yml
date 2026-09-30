@@ -30,6 +30,82 @@ services:
       timeout: 5s
       retries: 20
 
+  config-init:
+    image: alpine:3.22
+    restart: "no"
+    network_mode: none
+    environment:
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
+      TURN_REALM: ${TURN_REALM:-hi5central}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      ITSM_ADDRESS: ${ITSM_ADDRESS}
+      RMM_ADDRESS: ${RMM_ADDRESS}
+      ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      API_ADDRESS: ${API_ADDRESS}
+      DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        printf '%s\n' "$$TURN_SHARED_SECRET" > /run-secrets/turn_shared_secret
+
+        {
+          echo "listening-port=3478"
+          echo "fingerprint"
+          echo "use-auth-secret"
+          echo "static-auth-secret=$$TURN_SHARED_SECRET"
+          echo "realm=$$TURN_REALM"
+          echo "min-port=49160"
+          echo "max-port=49200"
+          echo "stale-nonce=600"
+          echo "no-loopback-peers"
+          echo "no-multicast-peers"
+          if [ -n "$$TURN_EXTERNAL_IP" ]; then
+            echo "external-ip=$$TURN_EXTERNAL_IP"
+          fi
+        } > /turn-config/turnserver.conf
+
+        : > /gateway-config/Caddyfile
+        if [ -n "$$ACME_EMAIL" ]; then
+          printf '{\n  email %s\n}\n\n' "$$ACME_EMAIL" >> /gateway-config/Caddyfile
+        fi
+        cat >> /gateway-config/Caddyfile <<EOF
+        $$API_ADDRESS {
+          reverse_proxy control-server:3001
+        }
+
+        $$ITSM_ADDRESS {
+          reverse_proxy itsm-web:80
+        }
+
+        $$RMM_ADDRESS {
+          reverse_proxy rmm-web:80
+        }
+
+        $$ADMIN_ADDRESS {
+          reverse_proxy admin-web:80
+        }
+
+        $$DOWNLOADS_ADDRESS {
+          root * /srv/downloads
+          file_server
+          header Cache-Control "public, max-age=300"
+        }
+        EOF
+
+        chown 1000:1000 /run-secrets/turn_shared_secret
+        chmod 640 /run-secrets/turn_shared_secret
+        chown 65534:65534 /turn-config/turnserver.conf
+        chmod 640 /turn-config/turnserver.conf
+        chown 0:0 /gateway-config/Caddyfile
+        chmod 600 /gateway-config/Caddyfile
+    volumes:
+      - runtime_secrets:/run-secrets
+      - turn_runtime_config:/turn-config
+      - gateway_runtime_config:/gateway-config
+
   migrate:
     image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
     restart: "no"
@@ -45,6 +121,8 @@ services:
     image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
     restart: unless-stopped
     depends_on:
+      config-init:
+        condition: service_completed_successfully
       migrate:
         condition: service_completed_successfully
       redis:
@@ -87,7 +165,7 @@ services:
       SELF_HOST_EVALUATION_DEVICE_LIMIT: ${SELF_HOST_EVALUATION_DEVICE_LIMIT:-25}
     volumes:
       - app_portal_packages:/srv/app-portal-packages
-      - ${TURN_SHARED_SECRET_PATH:-./secrets/turn_shared_secret}:/run/secrets/turn_shared_secret:ro
+      - runtime_secrets:/run/secrets:ro
     networks: [hi5internal]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
@@ -179,19 +257,24 @@ services:
     profiles: ["rmm"]
     image: coturn/coturn:4.6.3
     restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
     command: ["-c", "/etc/coturn/turnserver.conf"]
     ports:
       - "${TURN_LISTEN_PORT:-3478}:3478/tcp"
       - "${TURN_LISTEN_PORT:-3478}:3478/udp"
       - "${TURN_RELAY_MIN_PORT:-49160}-${TURN_RELAY_MAX_PORT:-49200}:49160-49200/udp"
     volumes:
-      - ${TURN_CONFIG_PATH:-./secrets/turnserver.conf}:/etc/coturn/turnserver.conf:ro
+      - turn_runtime_config:/etc/coturn:ro
     networks: [hi5internal]
 
   gateway:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on:
+      config-init:
+        condition: service_completed_successfully
       control-server:
         condition: service_healthy
     environment:
@@ -206,7 +289,7 @@ services:
       - "${GATEWAY_HTTPS_PORT:-443}:443"
       - "${GATEWAY_HTTPS_PORT:-443}:443/udp"
     volumes:
-      - ${CADDYFILE_PATH:-./Caddyfile}:/etc/caddy/Caddyfile:ro
+      - gateway_runtime_config:/etc/caddy:ro
       - downloads:/srv/downloads:ro
       - caddy_data:/data
       - caddy_config:/config
@@ -223,3 +306,6 @@ volumes:
   caddy_config:
   downloads:
   app_portal_packages:
+  runtime_secrets:
+  turn_runtime_config:
+  gateway_runtime_config:

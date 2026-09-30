@@ -125,6 +125,7 @@ else
   MFA_KEY=$(random_hex 32)
   RMM_KEY=$(random_hex 32)
   CONNECT_KEY=$(random_hex 32)
+  TURN_SHARED_SECRET_VALUE=$(random_hex 32)
 
   umask 077
   cat > "$ENV_FILE" <<EOF
@@ -144,6 +145,9 @@ REDIS_PASSWORD=$REDIS_PASSWORD_VALUE
 MFA_ENCRYPTION_KEY=$MFA_KEY
 RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY
 CONNECT_CODE_HMAC_KEY=$CONNECT_KEY
+TURN_SHARED_SECRET=$TURN_SHARED_SECRET_VALUE
+TURN_REALM=${HI5_TURN_REALM:-$DOMAIN}
+TURN_EXTERNAL_IP=${HI5_TURN_EXTERNAL_IP:-}
 
 APP_URL=$APP_URL_VALUE
 PORTAL_URL=$APP_URL_VALUE/portal
@@ -169,13 +173,6 @@ TURN_LISTEN_PORT=${HI5_TURN_LISTEN_PORT:-3478}
 TURN_RELAY_MIN_PORT=${HI5_TURN_RELAY_MIN_PORT:-49160}
 TURN_RELAY_MAX_PORT=${HI5_TURN_RELAY_MAX_PORT:-49200}
 
-# Optional absolute host bind paths. Defaults keep everything self-contained
-# in this deployment directory; these are useful for external config storage
-# and remote-admin environments where the Docker daemon sees another path.
-CADDYFILE_PATH=${HI5_CADDYFILE_PATH:-./Caddyfile}
-TURN_CONFIG_PATH=${HI5_TURN_CONFIG_PATH:-./secrets/turnserver.conf}
-TURN_SHARED_SECRET_PATH=${HI5_TURN_SHARED_SECRET_PATH:-./secrets/turn_shared_secret}
-
 CONTROL_SERVER_IMAGE=${HI5_CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
 ITSM_IMAGE=${HI5_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-itsm:latest}
 RMM_IMAGE=${HI5_RMM_IMAGE:-ghcr.io/dansut24/hi5central-rmm:latest}
@@ -195,8 +192,6 @@ MICROSOFT_CLIENT_SECRET=${HI5_MICROSOFT_CLIENT_SECRET:-}
 MICROSOFT_REDIRECT_URI=${HI5_MICROSOFT_REDIRECT_URI:-}
 EOF
   chmod 600 "$ENV_FILE"
-
-  TURN_EXTERNAL_IP=${HI5_TURN_EXTERNAL_IP:-} ./scripts/generate-turn-config.sh >/dev/null
   echo "Generated secure deployment configuration in $ENV_FILE."
 fi
 
@@ -273,4 +268,4 @@ echo "  Admin:     $(awk -F= '$1=="ADMIN_URL"{print substr($0,index($0,"=")+1)}'
 echo "  API:       $(awk -F= '$1=="API_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")"
 echo "  Downloads: $(awk -F= '$1=="DOWNLOADS_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")"
 echo
-echo "Persistent data is stored in Docker volumes. Keep .env and secrets/ backed up securely."
+echo "Persistent data is stored in Docker volumes. Keep .env and your Docker volumes backed up securely."

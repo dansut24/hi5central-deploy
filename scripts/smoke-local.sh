@@ -16,6 +16,7 @@ REDIS_PASSWORD=$(random_hex 18)
 MFA_KEY=$(random_hex 32)
 RMM_KEY=$(random_hex 32)
 CONNECT_KEY=$(random_hex 32)
+TURN_KEY=$(random_hex 32)
 trap 'docker compose -p "$PROJECT" --env-file "$ENV_FILE" down -v --remove-orphans >/dev/null 2>&1 || true; rm -f "$ENV_FILE"' EXIT INT TERM
 
 cat >"$ENV_FILE" <<EOF
@@ -24,6 +25,7 @@ DEPLOYMENT_MODE=self_hosted
 TENANCY_MODE=single
 ROOT_DOMAIN=split.localhost
 PRIMARY_TENANT_SLUG=local
+BACKGROUND_WORKERS_ENABLED=false
 
 POSTGRES_DB=hi5central
 POSTGRES_USER=hi5central
@@ -33,6 +35,9 @@ REDIS_PASSWORD=$REDIS_PASSWORD
 MFA_ENCRYPTION_KEY=$MFA_KEY
 RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY
 CONNECT_CODE_HMAC_KEY=$CONNECT_KEY
+TURN_SHARED_SECRET=$TURN_KEY
+TURN_REALM=split.localhost
+TURN_EXTERNAL_IP=
 
 APP_URL=http://itsm.split.localhost
 PORTAL_URL=http://itsm.split.localhost/portal
