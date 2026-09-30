@@ -138,6 +138,26 @@ complete_action() {
   api_post "/api/platform-operator/v1/actions/$id/complete" "$body" >/dev/null
 }
 
+
+deploy_test_manifest() {
+  manifest=$1
+  guard_environment test >/dev/null
+  [ "$(printf '%s' "$manifest" | jq -r 'type')" = object ] || {
+    echo "Test deployment manifest is invalid." >&2
+    return 1
+  }
+  for key in controlServer itsm rmm admin; do
+    value=$(printf '%s' "$manifest" | jq -r --arg key "$key" '.[$key] // empty')
+    case "$value" in *@sha256:*) ;; *) echo "Test manifest $key is not immutable." >&2; return 1 ;; esac
+  done
+  pin_manifest test "$manifest"
+  log "Deploying signed release manifest to Test."
+  compose_env test pull
+  compose_env test up -d --remove-orphans
+  wait_stack test
+  capture_manifest test
+}
+
 reset_test() {
   log "Resetting disposable Test environment."
   guard_environment test >/dev/null
@@ -184,6 +204,7 @@ process_action() {
   environment=$(printf '%s' "$response" | jq -r '.action.environment')
   action=$(printf '%s' "$response" | jq -r '.action.action')
   requested_ref=$(printf '%s' "$response" | jq -r '.action.payload.releaseRef // empty')
+  requested_manifest=$(printf '%s' "$response" | jq -c '.action.payload.manifest // {}')
   log "Claimed action $id: $action -> $environment"
 
   status=succeeded
@@ -193,6 +214,15 @@ process_action() {
 
   set +e
   case "$action:$environment" in
+    deploy:test)
+      output=$(deploy_test_manifest "$requested_manifest" 2>&1)
+      rc=$?
+      if [ "$rc" -eq 0 ]; then
+        manifest=$(printf '%s\n' "$output" | tail -1)
+      else
+        error_message=$output
+      fi
+      ;;
     reset:test)
       output=$(reset_test 2>&1)
       rc=$?

@@ -44,6 +44,10 @@ scheme=\${scheme:-https}
 turn_external=$(read_env "$LIVE_ENV" TURN_EXTERNAL_IP)
 licensing_url=$(read_env "$LIVE_ENV" LICENSING_SERVER_URL)
 licensing_public=$(read_env "$LIVE_ENV" LICENSING_PUBLIC_KEY_PEM)
+release_feed_url=$(read_env "$LIVE_ENV" RELEASE_FEED_URL)
+release_feed_url=${release_feed_url:-https://api.hi5central.com/api/releases/v1/feed}
+release_signing_public=$(read_env "$LIVE_ENV" RELEASE_SIGNING_PUBLIC_KEY_PEM)
+release_signing_public=${release_signing_public:-$licensing_public}
 operator_token=$(read_env "$LIVE_ENV" RELEASE_OPERATOR_TOKEN)
 if ! printf '%s' "$operator_token" | grep -Eq '^[0-9a-fA-F]{64}$'; then
   operator_token=$(random_hex 32)
@@ -206,6 +210,11 @@ ADMIN_IMAGE=$admin_image
 LICENSING_SERVER_URL=$licensing_url
 LICENSING_PUBLIC_KEY_PEM=$licensing_public
 RELEASE_OPERATOR_TOKEN=$operator_token
+RELEASE_FEED_URL=$release_feed_url
+RELEASE_SIGNING_PUBLIC_KEY_PEM=$release_signing_public
+RELEASE_SIGNING_PRIVATE_KEY_PEM=
+RELEASE_FEED_SYNC_INTERVAL_MS=21600000
+RELEASE_FEED_INITIAL_SYNC_DELAY_MS=45000
 LICENSING_REFRESH_INTERVAL_MS=43200000
 LICENSING_INITIAL_REFRESH_DELAY_MS=30000
 
