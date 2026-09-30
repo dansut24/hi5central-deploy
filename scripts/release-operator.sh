@@ -141,7 +141,7 @@ complete_action() {
 
 deploy_test_manifest() {
   manifest=$1
-  guard_environment test >/dev/null
+  guard_environment test >/dev/null || return 1
   [ "$(printf '%s' "$manifest" | jq -r 'type')" = object ] || {
     echo "Test deployment manifest is invalid." >&2
     return 1
@@ -150,22 +150,22 @@ deploy_test_manifest() {
     value=$(printf '%s' "$manifest" | jq -r --arg key "$key" '.[$key] // empty')
     case "$value" in *@sha256:*) ;; *) echo "Test manifest $key is not immutable." >&2; return 1 ;; esac
   done
-  pin_manifest test "$manifest"
+  pin_manifest test "$manifest" || return 1
   log "Deploying signed release manifest to Test."
-  compose_env test pull
-  compose_env test up -d --remove-orphans
-  wait_stack test
+  compose_env test pull || return 1
+  compose_env test up -d --remove-orphans || return 1
+  wait_stack test || return 1
   capture_manifest test
 }
 
 reset_test() {
   log "Resetting disposable Test environment."
-  guard_environment test >/dev/null
-  compose_env test down -v --remove-orphans
-  compose_env test pull
-  compose_env test up -d --remove-orphans
-  wait_stack test
-  manifest=$(capture_manifest test)
+  guard_environment test >/dev/null || return 1
+  compose_env test down -v --remove-orphans || return 1
+  compose_env test pull || return 1
+  compose_env test up -d --remove-orphans || return 1
+  wait_stack test || return 1
+  manifest=$(capture_manifest test) || return 1
   ref="test-reset-$(date -u +%Y%m%dT%H%M%SZ)"
   printf '%s\n%s\n' "$ref" "$manifest"
 }
@@ -184,16 +184,16 @@ promote_environment() {
     *) return 1 ;;
   esac
 
-  guard_environment "$source" >/dev/null
-  guard_environment "$target" >/dev/null
-  wait_stack "$source"
-  manifest=$(capture_manifest "$source")
-  pin_manifest "$target" "$manifest"
+  guard_environment "$source" >/dev/null || return 1
+  guard_environment "$target" >/dev/null || return 1
+  wait_stack "$source" || return 1
+  manifest=$(capture_manifest "$source") || return 1
+  pin_manifest "$target" "$manifest" || return 1
 
   log "Deploying $target from exact $source image digests."
-  compose_env "$target" pull
-  compose_env "$target" up -d --remove-orphans
-  wait_stack "$target"
+  compose_env "$target" pull || return 1
+  compose_env "$target" up -d --remove-orphans || return 1
+  wait_stack "$target" || return 1
   printf '%s' "$manifest"
 }
 
