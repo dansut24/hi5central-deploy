@@ -85,10 +85,12 @@ image_digest() {
   service=$2
   cid=$(compose_env "$environment" ps -q "$service")
   [ -n "$cid" ] || return 1
-  digest=$(docker inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$cid" | head -1)
+  image_id=$(docker inspect -f '{{.Image}}' "$cid")
+  [ -n "$image_id" ] || return 1
+  digest=$(docker image inspect -f '{{range .RepoDigests}}{{println .}}{{end}}' "$image_id" | head -1)
   case "$digest" in
     *@sha256:*) printf '%s' "$digest" ;;
-    *) return 1 ;;
+    *) echo "No immutable repository digest found for $environment/$service ($image_id)." >&2; return 1 ;;
   esac
 }
 
