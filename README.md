@@ -1,38 +1,102 @@
 # Hi5Central Deploy
 
-Canonical Docker Compose and gateway configuration for managed and self-hosted Hi5Central.
+Canonical Docker Compose deployment for managed and self-hosted Hi5Central.
 
-Server components:
+The stack includes:
+
 - PostgreSQL 17
 - Redis 8
 - Hi5Central Control Server
-- Hi5Central ITSM + browser Self Service
-- Hi5Central RMM
-- Hi5Central Admin
+- ITSM + browser Self Service
+- RMM
+- Admin
 - coturn
 - Caddy gateway
+- persistent Docker volumes
+- automatic database migrations
 
-Native endpoint applications (Agent, Viewer and App Portal) are not Docker services.
+Native endpoint applications such as the Agent, Viewer and App Portal are not Docker services.
 
-Only the migrate service, using the Control Server image, applies database migrations.
+## One-run self-host installation
 
-Start by copying .env.example to .env, setting strong secrets, creating the TURN secret/config files, then running docker compose pull and docker compose up -d.
+On a clean Linux host with Docker Engine and Docker Compose v2 installed:
 
-Pin all Hi5Central image variables to immutable release tags for production.
+```sh
+git clone https://github.com/dansut24/hi5central-deploy.git
+cd hi5central-deploy
+./install.sh --domain example.com --email admin@example.com
+```
 
-## Local integration smoke test
+The installer:
 
-After building the four server images locally as:
+1. validates Docker/Compose;
+2. generates PostgreSQL and Redis credentials;
+3. generates the MFA, RMM recovery and Connect encryption/HMAC keys;
+4. generates the coturn shared secret and configuration;
+5. writes a locked-down `.env`;
+6. validates the full Compose configuration;
+7. pulls the configured Hi5Central images;
+8. starts PostgreSQL and Redis;
+9. applies all database migrations;
+10. starts Control Server, ITSM, RMM, Admin, coturn and Caddy;
+11. waits for application health checks;
+12. verifies the database schema and prints the resulting URLs.
 
-- hi5central-control-server:extract-test
-- hi5central-itsm:extract-test
-- hi5central-rmm:extract-test
-- hi5central-admin:extract-test
+No external PostgreSQL or Redis installation is required.
 
-run:
+By default all products are installed. To install a subset:
 
-    ./scripts/smoke-local.sh
+```sh
+./install.sh --domain example.com --products itsm,rmm
+```
 
-The script creates a disposable Compose project with fresh PostgreSQL and Redis volumes, runs every Control Server migration, starts Control Server + ITSM + RMM + Admin, checks all health endpoints/product titles and confirms the migrated schema. It then removes the disposable containers, volumes and network automatically.
+For an internal/LAN deployment where TLS is terminated elsewhere:
 
-See PUBLISHING.md for the canonical repository and artifact map.
+```sh
+./install.sh --domain hi5.internal --http
+```
+
+Use `--configure-only` to generate the configuration without starting containers.
+
+### Non-interactive automation
+
+The same installer can be fully automated:
+
+```sh
+HI5_ROOT_DOMAIN=hi5.example.com \
+HI5_ACME_EMAIL=admin@example.com \
+HI5_PRODUCTS=itsm,rmm,admin \
+./install.sh
+```
+
+Advanced settings such as images, SMTP, Microsoft identity and host ports can be supplied with the documented `HI5_*` environment variables in `scripts/install.sh`.
+
+## DNS and firewall
+
+For the default HTTPS deployment, point these names at the self-host server:
+
+- `itsm.<domain>`
+- `rmm.<domain>`
+- `admin.<domain>`
+- `api.<domain>`
+- `downloads.<domain>`
+- `turn.<domain>`
+
+Allow TCP 80/443, UDP 443, TURN TCP/UDP 3478 and UDP 49160-49200.
+
+The gateway and TURN host ports can be overridden with `GATEWAY_HTTP_PORT`, `GATEWAY_HTTPS_PORT`, `TURN_LISTEN_PORT`, `TURN_RELAY_MIN_PORT` and `TURN_RELAY_MAX_PORT`.
+
+## Existing installations
+
+- `./scripts/up.sh` validates and starts an already configured deployment.
+- `./scripts/update.sh` pulls configured images, recreates services and prunes unused images.
+- `./scripts/down.sh` stops the stack without deleting persistent volumes.
+- `./scripts/validate.sh` validates secrets and the Compose model.
+
+Back up `.env`, `secrets/` and Docker volumes before upgrades.
+
+## Disposable integration smoke test
+
+`./scripts/smoke-local.sh` creates a disposable Compose project with fresh PostgreSQL and Redis volumes, applies every migration, starts Control Server + ITSM + RMM + Admin, verifies health and schema, then removes the disposable stack.
+
+See `PUBLISHING.md` for the canonical repository and artifact map.
