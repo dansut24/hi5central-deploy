@@ -24,6 +24,7 @@ read_env() {
 MFA=$(read_env MFA_ENCRYPTION_KEY)
 RMM=$(read_env RMM_RECOVERY_KEY_ENCRYPTION_KEY)
 CONNECT=$(read_env CONNECT_CODE_HMAC_KEY)
+TENANT_INSTALLER=$(read_env TENANT_INSTALLER_HMAC_KEY)
 TURN=$(read_env TURN_SHARED_SECRET)
 PG=$(read_env POSTGRES_PASSWORD)
 REDIS=$(read_env REDIS_PASSWORD)
@@ -34,6 +35,9 @@ RELEASE_OPERATOR_TOKEN=$(read_env RELEASE_OPERATOR_TOKEN)
 echo "$MFA" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "MFA_ENCRYPTION_KEY must be 64 hex characters." >&2; exit 1; }
 echo "$RMM" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "RMM_RECOVERY_KEY_ENCRYPTION_KEY must be 64 hex characters." >&2; exit 1; }
 echo "$CONNECT" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "CONNECT_CODE_HMAC_KEY must be 64 hex characters." >&2; exit 1; }
+if [ -n "$TENANT_INSTALLER" ]; then
+  echo "$TENANT_INSTALLER" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "TENANT_INSTALLER_HMAC_KEY must be 64 hex characters when set." >&2; exit 1; }
+fi
 echo "$TURN" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "TURN_SHARED_SECRET must be 64 hex characters." >&2; exit 1; }
 [ "${#PG}" -ge 24 ] || { echo "POSTGRES_PASSWORD must be at least 24 characters." >&2; exit 1; }
 [ "${#REDIS}" -ge 24 ] || { echo "REDIS_PASSWORD must be at least 24 characters." >&2; exit 1; }

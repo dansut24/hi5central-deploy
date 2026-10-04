@@ -140,6 +140,7 @@ write_environment() {
   mfa=$(random_hex 32)
   rmmkey=$(random_hex 32)
   connect=$(random_hex 32)
+  tenantinstaller=$(random_hex 32)
   turnsecret=$(random_hex 32)
 
   admin_url=
@@ -173,6 +174,7 @@ REDIS_PASSWORD=$redis
 MFA_ENCRYPTION_KEY=$mfa
 RMM_RECOVERY_KEY_ENCRYPTION_KEY=$rmmkey
 CONNECT_CODE_HMAC_KEY=$connect
+TENANT_INSTALLER_HMAC_KEY=$tenantinstaller
 TURN_SHARED_SECRET=$turnsecret
 TURN_REALM=$turn_host
 TURN_EXTERNAL_IP=$turn_external
