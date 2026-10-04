@@ -187,6 +187,8 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
       RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
       CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:?CONNECT_CODE_HMAC_KEY is required}
+      TENANT_INSTALLER_HMAC_KEY: ${TENANT_INSTALLER_HMAC_KEY:-}
+      TENANT_INSTALLER_ARTIFACT_DIR: /srv/tenant-installers
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -211,6 +213,7 @@ services:
       LICENSING_INITIAL_REFRESH_DELAY_MS: ${LICENSING_INITIAL_REFRESH_DELAY_MS:-30000}
     volumes:
       - app_portal_packages:/srv/app-portal-packages
+      - tenant_installer_artifacts:/srv/tenant-installers
       - runtime_secrets:/run/secrets:ro
     networks: [hi5internal]
     healthcheck:
@@ -373,6 +376,7 @@ volumes:
   caddy_config:
   downloads:
   app_portal_packages:
+  tenant_installer_artifacts:
   runtime_secrets:
   turn_runtime_config:
   gateway_runtime_config:
