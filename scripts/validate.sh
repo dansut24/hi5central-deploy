@@ -30,6 +30,7 @@ PG=$(read_env POSTGRES_PASSWORD)
 REDIS=$(read_env REDIS_PASSWORD)
 ROOT_DOMAIN=$(read_env ROOT_DOMAIN)
 DEPLOYMENT_MODE=$(read_env DEPLOYMENT_MODE)
+RELEASE_CHANNEL=$(read_env RELEASE_CHANNEL)
 RELEASE_OPERATOR_TOKEN=$(read_env RELEASE_OPERATOR_TOKEN)
 
 echo "$MFA" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "MFA_ENCRYPTION_KEY must be 64 hex characters." >&2; exit 1; }
@@ -42,6 +43,21 @@ echo "$TURN" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "TURN_SHARED_SECRET must b
 [ "${#PG}" -ge 24 ] || { echo "POSTGRES_PASSWORD must be at least 24 characters." >&2; exit 1; }
 [ "${#REDIS}" -ge 24 ] || { echo "REDIS_PASSWORD must be at least 24 characters." >&2; exit 1; }
 [ -n "$ROOT_DOMAIN" ] || { echo "ROOT_DOMAIN is required." >&2; exit 1; }
+case "$RELEASE_CHANNEL" in
+  stable|early-access|"") ;;
+  *) echo "RELEASE_CHANNEL must be stable or early-access." >&2; exit 1 ;;
+esac
+if [ "$DEPLOYMENT_MODE" = "self_hosted" ]; then
+  for image_key in CONTROL_SERVER_IMAGE ITSM_IMAGE RMM_IMAGE ADMIN_IMAGE; do
+    image=$(read_env "$image_key")
+    case "$image" in
+      *:latest)
+        echo "$image_key must not use the mutable :latest tag for self-hosted releases." >&2
+        exit 1
+        ;;
+    esac
+  done
+fi
 if [ "$DEPLOYMENT_MODE" = "managed" ]; then
   echo "$RELEASE_OPERATOR_TOKEN" | grep -Eq '^[0-9a-fA-F]{64}$' || { echo "Managed RELEASE_OPERATOR_TOKEN must be 64 hex characters." >&2; exit 1; }
 fi
