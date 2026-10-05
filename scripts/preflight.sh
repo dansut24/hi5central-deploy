@@ -63,7 +63,7 @@ if [ -z "$existing_hi5" ]; then
   port_conflict=0
   if command -v ss >/dev/null 2>&1; then
     tcp_in_use() { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]$1$"; }
-    udp_in_use() { ss -lunH 2>/dev/null | awk '{print $5}' | grep -Eq "[:.]$1$"; }
+    udp_in_use() { ss -lunH 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]$1$"; }
 
     for port in "$http_port" "$https_port"; do
       [ -n "$port" ] || continue
