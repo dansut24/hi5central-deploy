@@ -42,8 +42,13 @@ services:
       ITSM_ADDRESS: ${ITSM_ADDRESS}
       RMM_ADDRESS: ${RMM_ADDRESS}
       ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
       API_ADDRESS: ${API_ADDRESS}
       DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+      RELEASE_TEST_ADDRESSES: ${RELEASE_TEST_ADDRESSES:-}
+      RELEASE_TEST_GATEWAY_UPSTREAM: ${RELEASE_TEST_GATEWAY_UPSTREAM:-}
+      RELEASE_UAT_ADDRESSES: ${RELEASE_UAT_ADDRESSES:-}
+      RELEASE_UAT_GATEWAY_UPSTREAM: ${RELEASE_UAT_GATEWAY_UPSTREAM:-}
     command:
       - /bin/sh
       - -ec
@@ -83,11 +88,41 @@ services:
         $$RMM_ADDRESS {
           reverse_proxy rmm-web:80
         }
+        EOF
 
+        if [ -n "$$ADMIN_ADDRESS" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
         $$ADMIN_ADDRESS {
           reverse_proxy admin-web:80
         }
+        EOF
+        fi
 
+        if [ -n "$$HELP_ADDRESS" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$HELP_ADDRESS {
+          reverse_proxy docs-web:80
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_TEST_ADDRESSES" ] && [ -n "$$RELEASE_TEST_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_TEST_ADDRESSES {
+          reverse_proxy $$RELEASE_TEST_GATEWAY_UPSTREAM
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_UAT_ADDRESSES" ] && [ -n "$$RELEASE_UAT_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_UAT_ADDRESSES {
+          reverse_proxy $$RELEASE_UAT_GATEWAY_UPSTREAM
+        }
+        EOF
+        fi
+
+        cat >> /gateway-config/Caddyfile <<EOF
         $$DOWNLOADS_ADDRESS {
           root * /srv/downloads
           file_server
@@ -114,7 +149,7 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
-    command: ["npm", "run", "migrate"]
+    command: ["npm", "run", "migrate:dist"]
     networks: [hi5internal]
 
   control-server:
@@ -134,7 +169,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
       APP_URL: ${APP_URL}
@@ -152,6 +190,8 @@ services:
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
       RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
       CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:?CONNECT_CODE_HMAC_KEY is required}
+      TENANT_INSTALLER_HMAC_KEY: ${TENANT_INSTALLER_HMAC_KEY:-}
+      TENANT_INSTALLER_ARTIFACT_DIR: /srv/tenant-installers
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
@@ -163,11 +203,20 @@ services:
       TURN_HOST: ${TURN_HOST:-turn}
       TURN_SHARED_SECRET_FILE: /run/secrets/turn_shared_secret
       APP_PORTAL_PACKAGE_DIR: /srv/app-portal-packages
-      SELF_HOST_EVALUATION_PRODUCTS: ${SELF_HOST_EVALUATION_PRODUCTS:-itsm,rmm}
-      SELF_HOST_EVALUATION_USER_LIMIT: ${SELF_HOST_EVALUATION_USER_LIMIT:-10}
-      SELF_HOST_EVALUATION_DEVICE_LIMIT: ${SELF_HOST_EVALUATION_DEVICE_LIMIT:-25}
+      LICENSING_SERVER_URL: ${LICENSING_SERVER_URL:-https://licensing.hi5central.com}
+      LICENSING_PUBLIC_KEY_PEM: ${LICENSING_PUBLIC_KEY_PEM:-}
+      LICENSING_PRIVATE_KEY_PEM: ${LICENSING_PRIVATE_KEY_PEM:-}
+      RELEASE_OPERATOR_TOKEN: ${RELEASE_OPERATOR_TOKEN:-}
+      RELEASE_FEED_URL: ${RELEASE_FEED_URL:-https://api.hi5central.com/api/releases/v1/feed}
+      RELEASE_SIGNING_PUBLIC_KEY_PEM: ${RELEASE_SIGNING_PUBLIC_KEY_PEM:-}
+      RELEASE_SIGNING_PRIVATE_KEY_PEM: ${RELEASE_SIGNING_PRIVATE_KEY_PEM:-}
+      RELEASE_FEED_SYNC_INTERVAL_MS: ${RELEASE_FEED_SYNC_INTERVAL_MS:-21600000}
+      RELEASE_FEED_INITIAL_SYNC_DELAY_MS: ${RELEASE_FEED_INITIAL_SYNC_DELAY_MS:-45000}
+      LICENSING_REFRESH_INTERVAL_MS: ${LICENSING_REFRESH_INTERVAL_MS:-43200000}
+      LICENSING_INITIAL_REFRESH_DELAY_MS: ${LICENSING_INITIAL_REFRESH_DELAY_MS:-30000}
     volumes:
       - app_portal_packages:/srv/app-portal-packages
+      - tenant_installer_artifacts:/srv/tenant-installers
       - runtime_secrets:/run/secrets:ro
     networks: [hi5internal]
     healthcheck:
@@ -186,7 +235,10 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
       APP_URL: ${APP_URL}
@@ -213,7 +265,10 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
       APP_URL: ${APP_URL}
@@ -239,7 +294,10 @@ services:
         condition: service_healthy
     environment:
       DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
       TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
       ROOT_DOMAIN: ${ROOT_DOMAIN}
       PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
       APP_URL: ${APP_URL}
@@ -249,6 +307,17 @@ services:
       ADMIN_URL: ${ADMIN_URL:-}
       DOWNLOADS_URL: ${DOWNLOADS_URL}
       TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  docs-web:
+    profiles: ["docs"]
+    image: ${DOCS_IMAGE:-ghcr.io/dansut24/hi5central-docs:latest}
+    restart: unless-stopped
     networks: [hi5internal]
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
@@ -284,6 +353,7 @@ services:
       ITSM_ADDRESS: ${ITSM_ADDRESS}
       RMM_ADDRESS: ${RMM_ADDRESS}
       ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
       API_ADDRESS: ${API_ADDRESS}
       DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
       ACME_EMAIL: ${ACME_EMAIL:-}
@@ -309,6 +379,7 @@ volumes:
   caddy_config:
   downloads:
   app_portal_packages:
+  tenant_installer_artifacts:
   runtime_secrets:
   turn_runtime_config:
   gateway_runtime_config:
