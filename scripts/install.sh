@@ -383,6 +383,7 @@ else
   TENANT_INSTALLER_KEY=${HI5_TENANT_INSTALLER_HMAC_KEY:-}
   TURN_SHARED_SECRET_VALUE=${HI5_TURN_SHARED_SECRET:-}
   RELEASE_OPERATOR_TOKEN_VALUE=${HI5_RELEASE_OPERATOR_TOKEN:-}
+  INITIAL_SETUP_TOKEN_VALUE=${HI5_INITIAL_SETUP_TOKEN:-}
 
   if [ "$SECRET_MODE" = auto ]; then
     POSTGRES_PASSWORD_VALUE=${POSTGRES_PASSWORD_VALUE:-$(random_hex 24)}
@@ -393,6 +394,7 @@ else
     TENANT_INSTALLER_KEY=${TENANT_INSTALLER_KEY:-$(random_hex 32)}
     TURN_SHARED_SECRET_VALUE=${TURN_SHARED_SECRET_VALUE:-$(random_hex 32)}
     RELEASE_OPERATOR_TOKEN_VALUE=${RELEASE_OPERATOR_TOKEN_VALUE:-$(random_hex 32)}
+    INITIAL_SETUP_TOKEN_VALUE=${INITIAL_SETUP_TOKEN_VALUE:-$(random_hex 32)}
   else
     if ! is_interactive; then
       [ -n "$POSTGRES_PASSWORD_VALUE" ] &&
@@ -415,6 +417,7 @@ else
       [ -n "$TURN_SHARED_SECRET_VALUE" ] || TURN_SHARED_SECRET_VALUE=$(prompt_secret "TURN shared secret (64 hex characters)")
       RELEASE_OPERATOR_TOKEN_VALUE=${RELEASE_OPERATOR_TOKEN_VALUE:-$(random_hex 32)}
     fi
+    INITIAL_SETUP_TOKEN_VALUE=${INITIAL_SETUP_TOKEN_VALUE:-$(random_hex 32)}
   fi
 
   URL_PORT=
@@ -496,6 +499,7 @@ RMM_RECOVERY_KEY_ENCRYPTION_KEY=$RMM_KEY
 CONNECT_CODE_HMAC_KEY=$CONNECT_KEY
 TENANT_INSTALLER_HMAC_KEY=$TENANT_INSTALLER_KEY
 TURN_SHARED_SECRET=$TURN_SHARED_SECRET_VALUE
+INITIAL_SETUP_TOKEN=$INITIAL_SETUP_TOKEN_VALUE
 TURN_REALM=${HI5_TURN_REALM:-$DOMAIN}
 TURN_EXTERNAL_IP=$TURN_EXTERNAL_IP_VALUE
 
@@ -661,6 +665,15 @@ admin_url=$(awk -F= '$1=="ADMIN_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FI
 [ -n "$admin_url" ] && echo "  Admin:     $admin_url"
 echo "  API:       $(awk -F= '$1=="API_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")"
 echo "  Downloads: $(awk -F= '$1=="DOWNLOADS_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")"
+setup_token=$(awk -F= '$1=="INITIAL_SETUP_TOKEN"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")
+app_url=$(awk -F= '$1=="APP_URL"{print substr($0,index($0,"=")+1)}' "$ENV_FILE")
+if [ -n "$setup_token" ]; then
+  echo
+  echo "First-time setup:"
+  echo "  $app_url/signup#setup=$setup_token"
+  echo
+  echo "Keep this setup URL private. It is accepted only while the installation has no tenant."
+fi
 echo
 echo "Persistent data is stored in Docker volumes."
 echo "Keep .env and backups secure. Create a backup after first-time application setup."
