@@ -142,7 +142,7 @@ services:
       - gateway_runtime_config:/gateway-config
 
   migrate:
-    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:latest}
     restart: "no"
     depends_on:
       postgres:
@@ -153,7 +153,7 @@ services:
     networks: [hi5internal]
 
   control-server:
-    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:latest}
     restart: unless-stopped
     depends_on:
       config-init:
@@ -228,7 +228,7 @@ services:
 
   itsm-web:
     profiles: ["itsm"]
-    image: ${ITSM_IMAGE:-ghcr.io/dansut24/hi5central-itsm:latest}
+    image: ${ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:latest}
     restart: unless-stopped
     depends_on:
       control-server:
@@ -258,7 +258,7 @@ services:
 
   rmm-web:
     profiles: ["rmm"]
-    image: ${RMM_IMAGE:-ghcr.io/dansut24/hi5central-rmm:latest}
+    image: ${RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:latest}
     restart: unless-stopped
     depends_on:
       control-server:
@@ -287,7 +287,7 @@ services:
 
   admin-web:
     profiles: ["admin"]
-    image: ${ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-admin:latest}
+    image: ${ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:latest}
     restart: unless-stopped
     depends_on:
       control-server:

@@ -6,10 +6,10 @@ cd "$ROOT_DIR"
 
 PROJECT=${HI5_SMOKE_PROJECT:-hi5central-selfhost-smoke}
 EDITION=${HI5_SMOKE_EDITION:-standard}
-CONTROL_IMAGE=${HI5_SMOKE_CONTROL_IMAGE:-ghcr.io/dansut24/hi5central-control-server:dev}
-ITSM_IMAGE=${HI5_SMOKE_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-itsm:dev}
-RMM_IMAGE=${HI5_SMOKE_RMM_IMAGE:-ghcr.io/dansut24/hi5central-rmm:dev}
-ADMIN_IMAGE=${HI5_SMOKE_ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-admin:dev}
+CONTROL_IMAGE=${HI5_SMOKE_CONTROL_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:dev}
+ITSM_IMAGE=${HI5_SMOKE_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:dev}
+RMM_IMAGE=${HI5_SMOKE_RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:dev}
+ADMIN_IMAGE=${HI5_SMOKE_ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:dev}
 LICENSE_KEY=${HI5_SMOKE_LICENSE_KEY:-}
 LICENSE_SERVER=${HI5_SMOKE_LICENSE_SERVER:-https://dev-api.hi5central.com}
 LICENSE_PUBLIC_KEY=${HI5_SMOKE_LICENSE_PUBLIC_KEY:-}
