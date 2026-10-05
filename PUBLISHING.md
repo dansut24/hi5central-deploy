@@ -6,10 +6,10 @@ This file defines the canonical repository and artifact boundaries for the split
 
 | Local repository | GitHub target | Current local commit | Published artifact |
 | --- | --- | --- | --- |
-| hi5central-control-server | dansut24/hi5central-control-server | 459bf04ba5d0 | ghcr.io/dansut24/hi5central-control-server |
-| hi5central-itsm | dansut24/hi5central-itsm | 714c4589202a | ghcr.io/dansut24/hi5central-itsm |
-| hi5central-rmm | dansut24/hi5central-rmm | 19fcb5054c0a | ghcr.io/dansut24/hi5central-rmm |
-| hi5central-admin | dansut24/hi5central-admin | 4c1f8e4751e3 | ghcr.io/dansut24/hi5central-admin |
+| Platform API | dansut24/Hi5Central-Platform (`services/api`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-api |
+| Platform ITSM | dansut24/Hi5Central-Platform (`apps/itsm`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-itsm |
+| Platform RMM | dansut24/Hi5Central-Platform (`apps/rmm`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-rmm |
+| Platform Admin | dansut24/Hi5Central-Platform (`apps/admin`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-admin |
 | Hi5Central-Agent | dansut24/Hi5Central-Agent | existing production repo | Native Agent installers/packages |
 | hi5central-app-portal | dansut24/hi5central-app-portal | f2224a291c84 | Native App Portal builds |
 | hi5central-viewer | dansut24/hi5central-viewer | f909d4a646d7 | Native Viewer installers/builds |
