@@ -531,6 +531,8 @@ CONTROL_SERVER_IMAGE=${HI5_CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-pla
 ITSM_IMAGE=${HI5_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:$PLATFORM_TAG}
 RMM_IMAGE=${HI5_RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:$PLATFORM_TAG}
 ADMIN_IMAGE=${HI5_ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:$PLATFORM_TAG}
+AGENT_DEPLOYMENT_ASSETS_IMAGE=${HI5_AGENT_DEPLOYMENT_ASSETS_IMAGE:-ghcr.io/dansut24/hi5central-agent-deployment-assets:$PLATFORM_TAG}
+TENANT_INSTALLER_API_BASE=$API_URL_VALUE
 
 LICENSING_SERVER_URL=${HI5_LICENSING_SERVER_URL:-https://licensing.hi5central.com}
 LICENSING_PUBLIC_KEY_PEM=${HI5_LICENSING_PUBLIC_KEY_PEM:-}
