@@ -1,55 +1,90 @@
-# Hi5Central repository publishing map
+# Hi5Central publishing model
 
-This file defines the canonical repository and artifact boundaries for the split Hi5Central platform.
+## Canonical repositories
 
-## Repositories
+### Hi5Central-Platform — private
 
-| Local repository | GitHub target | Current local commit | Published artifact |
-| --- | --- | --- | --- |
-| Platform API | dansut24/Hi5Central-Platform (`services/api`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-api |
-| Platform ITSM | dansut24/Hi5Central-Platform (`apps/itsm`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-itsm |
-| Platform RMM | dansut24/Hi5Central-Platform (`apps/rmm`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-rmm |
-| Platform Admin | dansut24/Hi5Central-Platform (`apps/admin`) | synchronized platform commit | ghcr.io/dansut24/hi5central-platform-admin |
-| Hi5Central-Agent | dansut24/Hi5Central-Agent | existing production repo | Native Agent installers/packages |
-| hi5central-app-portal | dansut24/hi5central-app-portal | f2224a291c84 | Native App Portal builds |
-| hi5central-viewer | dansut24/hi5central-viewer | f909d4a646d7 | Native Viewer installers/builds |
-| hi5central-deploy | dansut24/hi5central-deploy | this repository | Compose/self-host deployment |
+Canonical application/product monorepo containing:
 
-## Ownership rules
+- API / Control Server
+- ITSM
+- RMM
+- Platform/MSP Admin
+- Agent build sources and packaging
+- Viewer build sources and packaging
+- App Portal build sources and packaging
+- shared packages
+- CI and product release workflows
 
-- Control Server is the only database migration owner until backend services are deliberately separated.
-- ITSM owns the analyst workspace and browser requester Self-Service frontend.
-- RMM owns the RMM web frontend.
-- Admin owns the platform administration and software-qualification UI.
-- Software qualification orchestration remains in Control Server for now.
-- Agent owns privileged endpoint execution and the cross-platform endpoint service.
-- App Portal owns the native end-user software portal and talks to Agent through a local authenticated broker.
-- Viewer owns the native remote-session viewer and is versioned independently from Agent.
-- Deploy owns Compose, Caddy/gateway, TURN, self-host configuration and deployment scripts.
+Platform container images are published to GHCR using immutable `sha-<commit>` tags first.
 
-## Publishing sequence
+### hi5central-deploy — public
 
-1. Create/grant access to the seven new private GitHub repositories.
-2. Push the prepared local `main` branch of each repository.
-3. Require the independent CI workflow to pass before any cutover.
-4. Publish Control Server, ITSM, RMM and Admin images to GHCR.
-5. Publish App Portal and Viewer native build artifacts.
-6. Pin `hi5central-deploy` image variables to immutable release tags.
-7. Run the split stack side-by-side with production against a cloned/test database.
-8. Validate authentication, ITSM, RMM, Admin, Agent jobs, Viewer sessions and App Portal APIs.
-9. Switch live gateway routes one surface at a time.
-10. Only after successful cutover remove duplicated source from `lsl-itsm-platform` and `Hi5Central-Agent`.
+Public self-host distribution surface containing:
 
-## Production release policy
+- Compose
+- Caddy/gateway configuration
+- coturn configuration
+- guided installer
+- validation/preflight
+- updater
+- backup/restore
+- self-host documentation
 
-- Never deploy `latest` in a production self-hosted release manifest.
-- Tag server images with a semantic release tag and immutable SHA tag.
-- Deploy repository releases pin all component versions together.
-- Native Agent, Viewer and App Portal versions are independently versioned but compatibility is documented in each Deploy release.
-- Database migrations execute once through the Control Server `migrate` service before Control Server starts.
+Self-hosters do not require source access to the private monorepo.
+
+## Internal environments
+
+Hi5Central operates two hosted application environments:
+
+1. **Development** — receives approved development builds for integration testing.
+2. **Production** — live Hi5Central service; receives a tested immutable image set.
+
+Production and self-host release publication are deliberately separate decisions.
+
+## Build once, promote
+
+Each platform commit is built into immutable images:
+
+```text
+ghcr.io/dansut24/hi5central-platform-api:sha-<commit>
+ghcr.io/dansut24/hi5central-platform-itsm:sha-<commit>
+ghcr.io/dansut24/hi5central-platform-rmm:sha-<commit>
+ghcr.io/dansut24/hi5central-platform-admin:sha-<commit>
+```
+
+Development/Production aliases point to those already-built images. A self-host release also promotes the already-built SHA; it does not rebuild application code.
+
+## Self-host release publication
+
+After a Production deployment has passed smoke testing, run the **Publish Self-Hosted Release** workflow in `Hi5Central-Platform`.
+
+Inputs:
+
+- exact 40-character tested commit SHA;
+- semantic version, e.g. `v1.4.0` or `v1.5.0-rc.1`;
+- channel: `stable` or `early-access`.
+
+The workflow verifies all required immutable images exist, then promotes the exact set to:
+
+```text
+:<semantic-version>
+:<selected-channel>
+```
+
+No image is rebuilt during publication.
+
+## Policy
+
+- Never use `:latest` in a self-host release.
+- Stable is the default self-host channel.
+- Early Access is opt-in.
+- A push/merge to Production never changes Stable automatically.
+- Database migrations are owned by the Control Server migration service.
+- Native Agent/Viewer/App Portal artifacts remain independently versioned but their compatible versions must be recorded with each platform release.
+- Self-host deployment changes are validated independently in `hi5central-deploy`.
+- Fresh-install acceptance is performed on a clean VPS before the deployment package is declared production-ready.
 
 ## Legacy repositories
 
-`lsl-itsm-platform` remains the production rollback source until ITSM, RMM, Admin and Control Server have completed side-by-side cutover. It should then be archived rather than immediately deleted.
-
-`Hi5Central-Agent` remains the production Agent source. App Portal and Viewer source copies stay in that repository until their standalone repositories have completed their first successful GitHub CI/release and Agent packaging has been changed to consume pinned release artifacts.
+Older split repositories remain rollback/history sources while the monorepo cutover is being completed. New product development and release orchestration should target `Hi5Central-Platform`; do not introduce new cross-repository build dependencies unless there is a deliberate exception.

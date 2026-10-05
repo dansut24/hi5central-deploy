@@ -141,8 +141,25 @@ services:
       - turn_runtime_config:/turn-config
       - gateway_runtime_config:/gateway-config
 
+  agent-deployment-assets:
+    image: ${AGENT_DEPLOYMENT_ASSETS_IMAGE:-ghcr.io/dansut24/hi5central-agent-deployment-assets:${PLATFORM_TAG:-stable}}
+    restart: "no"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        rm -rf /target/templates /target/generic
+        mkdir -p /target/templates /target/generic
+        cp -a /assets/templates/. /target/templates/
+        cp -a /assets/generic/. /target/generic/
+        find /target/templates /target/generic -type d -exec chmod 0755 {} \;
+        find /target/templates /target/generic -type f -exec chmod 0644 {} \;
+        echo "Hi5Central Agent deployment assets seeded."
+    volumes:
+      - tenant_installer_artifacts:/target
+
   migrate:
-    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:latest}
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:stable}
     restart: "no"
     depends_on:
       postgres:
@@ -153,12 +170,14 @@ services:
     networks: [hi5internal]
 
   control-server:
-    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:latest}
+    image: ${CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:stable}
     restart: unless-stopped
     depends_on:
       config-init:
         condition: service_completed_successfully
       migrate:
+        condition: service_completed_successfully
+      agent-deployment-assets:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
@@ -191,6 +210,9 @@ services:
       RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
       CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:?CONNECT_CODE_HMAC_KEY is required}
       TENANT_INSTALLER_HMAC_KEY: ${TENANT_INSTALLER_HMAC_KEY:-}
+      TENANT_INSTALLER_API_BASE: ${TENANT_INSTALLER_API_BASE:-}
+      TENANT_INSTALLER_GENERIC_ASSET_DIR: /srv/tenant-installers/generic
+      INITIAL_SETUP_TOKEN: ${INITIAL_SETUP_TOKEN:?INITIAL_SETUP_TOKEN is required}
       TENANT_INSTALLER_ARTIFACT_DIR: /srv/tenant-installers
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}
@@ -228,7 +250,7 @@ services:
 
   itsm-web:
     profiles: ["itsm"]
-    image: ${ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:latest}
+    image: ${ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:stable}
     restart: unless-stopped
     depends_on:
       control-server:
@@ -258,7 +280,7 @@ services:
 
   rmm-web:
     profiles: ["rmm"]
-    image: ${RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:latest}
+    image: ${RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:stable}
     restart: unless-stopped
     depends_on:
       control-server:
@@ -287,7 +309,7 @@ services:
 
   admin-web:
     profiles: ["admin"]
-    image: ${ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:latest}
+    image: ${ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:stable}
     restart: unless-stopped
     depends_on:
       control-server:
