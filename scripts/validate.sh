@@ -48,7 +48,7 @@ case "$RELEASE_CHANNEL" in
   *) echo "RELEASE_CHANNEL must be stable or early-access." >&2; exit 1 ;;
 esac
 if [ "$DEPLOYMENT_MODE" = "self_hosted" ]; then
-  for image_key in CONTROL_SERVER_IMAGE ITSM_IMAGE RMM_IMAGE ADMIN_IMAGE; do
+  for image_key in CONTROL_SERVER_IMAGE ITSM_IMAGE RMM_IMAGE ADMIN_IMAGE AGENT_DEPLOYMENT_ASSETS_IMAGE; do
     image=$(read_env "$image_key")
     case "$image" in
       *:latest)
