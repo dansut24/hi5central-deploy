@@ -152,8 +152,8 @@ services:
         mkdir -p /target/templates /target/generic
         cp -a /assets/templates/. /target/templates/
         cp -a /assets/generic/. /target/generic/
-        chmod -R go-rwx /target/templates
-        chmod -R go-rwx /target/generic
+        find /target/templates /target/generic -type d -exec chmod 0755 {} \;
+        find /target/templates /target/generic -type f -exec chmod 0644 {} \;
         echo "Hi5Central Agent deployment assets seeded."
     volumes:
       - tenant_installer_artifacts:/target
