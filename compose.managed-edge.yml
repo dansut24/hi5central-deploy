@@ -1,6 +1,6 @@
 services:
   gateway:
-    container_name: ${MANAGED_GATEWAY_CONTAINER_NAME:-hi5central-managed-gateway}
+    container_name: ${RELEASE_GATEWAY_CONTAINER_NAME:-hi5central-managed-gateway}
     networks:
       - hi5internal
       - managed_edge
