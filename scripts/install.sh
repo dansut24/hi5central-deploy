@@ -276,10 +276,10 @@ TURN_LISTEN_PORT=${HI5_TURN_LISTEN_PORT:-3478}
 TURN_RELAY_MIN_PORT=${HI5_TURN_RELAY_MIN_PORT:-49160}
 TURN_RELAY_MAX_PORT=${HI5_TURN_RELAY_MAX_PORT:-49200}
 
-CONTROL_SERVER_IMAGE=${HI5_CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-control-server:latest}
-ITSM_IMAGE=${HI5_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-itsm:latest}
-RMM_IMAGE=${HI5_RMM_IMAGE:-ghcr.io/dansut24/hi5central-rmm:latest}
-ADMIN_IMAGE=${HI5_ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-admin:latest}
+CONTROL_SERVER_IMAGE=${HI5_CONTROL_SERVER_IMAGE:-ghcr.io/dansut24/hi5central-platform-api:latest}
+ITSM_IMAGE=${HI5_ITSM_IMAGE:-ghcr.io/dansut24/hi5central-platform-itsm:latest}
+RMM_IMAGE=${HI5_RMM_IMAGE:-ghcr.io/dansut24/hi5central-platform-rmm:latest}
+ADMIN_IMAGE=${HI5_ADMIN_IMAGE:-ghcr.io/dansut24/hi5central-platform-admin:latest}
 
 LICENSING_SERVER_URL=${HI5_LICENSING_SERVER_URL:-https://licensing.hi5central.com}
 LICENSING_PUBLIC_KEY_PEM=${HI5_LICENSING_PUBLIC_KEY_PEM:-}
