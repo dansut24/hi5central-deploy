@@ -142,7 +142,7 @@ services:
       - gateway_runtime_config:/gateway-config
 
   agent-deployment-assets:
-    image: ${AGENT_DEPLOYMENT_ASSETS_IMAGE:?AGENT_DEPLOYMENT_ASSETS_IMAGE is required}
+    image: ${AGENT_DEPLOYMENT_ASSETS_IMAGE:-ghcr.io/dansut24/hi5central-agent-deployment-assets:${PLATFORM_TAG:-stable}}
     restart: "no"
     network_mode: none
     entrypoint: ["/bin/sh", "-ec"]
@@ -210,7 +210,7 @@ services:
       RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
       CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:?CONNECT_CODE_HMAC_KEY is required}
       TENANT_INSTALLER_HMAC_KEY: ${TENANT_INSTALLER_HMAC_KEY:-}
-      TENANT_INSTALLER_API_BASE: ${TENANT_INSTALLER_API_BASE:-${API_URL}}
+      TENANT_INSTALLER_API_BASE: ${TENANT_INSTALLER_API_BASE:-}
       TENANT_INSTALLER_GENERIC_ASSET_DIR: /srv/tenant-installers/generic
       INITIAL_SETUP_TOKEN: ${INITIAL_SETUP_TOKEN:?INITIAL_SETUP_TOKEN is required}
       TENANT_INSTALLER_ARTIFACT_DIR: /srv/tenant-installers
