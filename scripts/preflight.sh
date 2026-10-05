@@ -51,6 +51,55 @@ if [ -n "$disk_kb" ] && [ "$disk_kb" -lt 20971520 ]; then
   echo "WARN Less than 20 GiB disk space is currently free."
 fi
 
+# On a fresh host, fail early when required host ports are already occupied.
+# Existing Hi5Central containers are excluded so preflight remains useful for upgrades.
+existing_hi5=$(docker compose ps -q 2>/dev/null || true)
+if [ -z "$existing_hi5" ]; then
+  http_port=$(read_env GATEWAY_HTTP_PORT)
+  https_port=$(read_env GATEWAY_HTTPS_PORT)
+  turn_port=$(read_env TURN_LISTEN_PORT)
+  profiles_for_ports=$(read_env COMPOSE_PROFILES)
+
+  port_conflict=0
+  if command -v ss >/dev/null 2>&1; then
+    tcp_in_use() { ss -ltnH 2>/dev/null | awk '{print $4}' | grep -Eq "[:.]$1$"; }
+    udp_in_use() { ss -lunH 2>/dev/null | awk '{print $5}' | grep -Eq "[:.]$1$"; }
+
+    for port in "$http_port" "$https_port"; do
+      [ -n "$port" ] || continue
+      if tcp_in_use "$port"; then
+        echo "FAIL TCP port $port is already in use." >&2
+        port_conflict=1
+      fi
+    done
+    if [ -n "$https_port" ] && udp_in_use "$https_port"; then
+      echo "FAIL UDP port $https_port is already in use (HTTPS/HTTP3 gateway)." >&2
+      port_conflict=1
+    fi
+
+    case ",$profiles_for_ports," in
+      *,rmm,*)
+        if [ -n "$turn_port" ] && tcp_in_use "$turn_port"; then
+          echo "FAIL TURN TCP port $turn_port is already in use." >&2
+          port_conflict=1
+        fi
+        if [ -n "$turn_port" ] && udp_in_use "$turn_port"; then
+          echo "FAIL TURN UDP port $turn_port is already in use." >&2
+          port_conflict=1
+        fi
+        ;;
+    esac
+
+    [ "$port_conflict" -eq 0 ] || {
+      echo "Choose different ports or stop the conflicting service, then rerun the installer." >&2
+      exit 1
+    }
+    echo "Ports:         required host ports are available"
+  else
+    echo "WARN 'ss' is not available; host-port conflict checks were skipped."
+  fi
+fi
+
 if [ "$SKIP_DNS" = 1 ]; then
   echo "DNS:           skipped"
   echo "Preflight passed."
