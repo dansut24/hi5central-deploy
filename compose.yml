@@ -94,32 +94,32 @@ services:
         }
         EOF
 
-        if [ "$DEPLOYMENT_MODE" = managed ] && [ "$TENANCY_MODE" = multi ] && [ -n "$MANAGED_TENANT_SLUGS" ]; then
-          old_ifs=$IFS
+        if [ "$$DEPLOYMENT_MODE" = managed ] && [ "$$TENANCY_MODE" = multi ] && [ -n "$$MANAGED_TENANT_SLUGS" ]; then
+          old_ifs=$$IFS
           IFS=','
-          for slug in $MANAGED_TENANT_SLUGS; do
-            slug=$(printf '%s' "$slug" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
-            case "$slug" in
+          for slug in $$MANAGED_TENANT_SLUGS; do
+            slug=$$(printf '%s' "$$slug" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+            case "$$slug" in
               ''|*[!a-z0-9-]*|-*|*-) echo "Invalid managed tenant slug: $slug" >&2; exit 1 ;;
             esac
             cat >> /gateway-config/Caddyfile <<EOF
-        $slug.$ROOT_DOMAIN {
+        $$slug.$$ROOT_DOMAIN {
           reverse_proxy itsm-web:80
         }
 
-        $slug-portal.$ROOT_DOMAIN {
+        $$slug-portal.$$ROOT_DOMAIN {
           reverse_proxy itsm-web:80
         }
 
-        $slug-rmm.$ROOT_DOMAIN {
+        $$slug-rmm.$$ROOT_DOMAIN {
           reverse_proxy rmm-web:80
         }
         EOF
           done
-          IFS=$old_ifs
+          IFS=$$old_ifs
         fi
 
-        if [ -n "$ADMIN_ADDRESS" ]; then
+        if [ -n "$$ADMIN_ADDRESS" ]; then
           cat >> /gateway-config/Caddyfile <<EOF
         $$ADMIN_ADDRESS {
           reverse_proxy admin-web:80
