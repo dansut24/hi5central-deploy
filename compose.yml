@@ -100,7 +100,7 @@ services:
           for slug in $$MANAGED_TENANT_SLUGS; do
             slug=$$(printf '%s' "$$slug" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
             case "$$slug" in
-              ''|*[!a-z0-9-]*|-*|*-) echo "Invalid managed tenant slug: $slug" >&2; exit 1 ;;
+              ''|*[!a-z0-9-]*|-*|*-) echo "Invalid managed tenant slug: $$slug" >&2; exit 1 ;;
             esac
             cat >> /gateway-config/Caddyfile <<EOF
         $$slug.$$ROOT_DOMAIN {
