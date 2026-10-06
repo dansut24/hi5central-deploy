@@ -39,6 +39,10 @@ services:
       TURN_REALM: ${TURN_REALM:-hi5central}
       TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
       ACME_EMAIL: ${ACME_EMAIL:-}
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      MANAGED_TENANT_SLUGS: ${MANAGED_TENANT_SLUGS:-}
       ITSM_ADDRESS: ${ITSM_ADDRESS}
       RMM_ADDRESS: ${RMM_ADDRESS}
       ADMIN_ADDRESS: ${ADMIN_ADDRESS}
@@ -90,7 +94,32 @@ services:
         }
         EOF
 
-        if [ -n "$$ADMIN_ADDRESS" ]; then
+        if [ "$DEPLOYMENT_MODE" = managed ] && [ "$TENANCY_MODE" = multi ] && [ -n "$MANAGED_TENANT_SLUGS" ]; then
+          old_ifs=$IFS
+          IFS=','
+          for slug in $MANAGED_TENANT_SLUGS; do
+            slug=$(printf '%s' "$slug" | tr '[:upper:]' '[:lower:]' | tr -d ' ')
+            case "$slug" in
+              ''|*[!a-z0-9-]*|-*|*-) echo "Invalid managed tenant slug: $slug" >&2; exit 1 ;;
+            esac
+            cat >> /gateway-config/Caddyfile <<EOF
+        $slug.$ROOT_DOMAIN {
+          reverse_proxy itsm-web:80
+        }
+
+        $slug-portal.$ROOT_DOMAIN {
+          reverse_proxy itsm-web:80
+        }
+
+        $slug-rmm.$ROOT_DOMAIN {
+          reverse_proxy rmm-web:80
+        }
+        EOF
+          done
+          IFS=$old_ifs
+        fi
+
+        if [ -n "$ADMIN_ADDRESS" ]; then
           cat >> /gateway-config/Caddyfile <<EOF
         $$ADMIN_ADDRESS {
           reverse_proxy admin-web:80
@@ -348,7 +377,7 @@ services:
       retries: 12
 
   turn:
-    profiles: ["rmm"]
+    profiles: ["${TURN_SERVICE_PROFILE:-rmm}"]
     image: coturn/coturn:4.6.3
     restart: unless-stopped
     depends_on:
