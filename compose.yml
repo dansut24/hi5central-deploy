@@ -159,7 +159,7 @@ services:
           # manifest. This includes every current route, not only Stripe.
           : > /gateway-config/Caddyfile
           if [ -n "$ACME_EMAIL" ]; then
-            printf '{\\n  email %s\\n}\\n\\n' "$ACME_EMAIL" >> /gateway-config/Caddyfile
+            printf '{\n  email %s\n}\n\n' "$ACME_EMAIL" >> /gateway-config/Caddyfile
           fi
           cat >> /gateway-config/Caddyfile <<EOF
         http://test-api.hi5central.com {
