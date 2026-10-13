@@ -198,30 +198,30 @@ services:
 
         # Isolated shared-master pilot: only this tenant's organisation API.
         http://testing-test.hi5central.com {
-          # Exact pilot tenant only: Test API and Test web must share one immutable build.
+            # Exact pilot tenant only: Test API and Test web must share one immutable build.
         EOF
           if [ "$STRIPE_TEST_GATEWAY_ROUTING_MODE" = "webhook" ]; then
             cat >> /gateway-config/Caddyfile <<EOF
-          # HI5_STRIPE_SANDBOX_PILOT_START
-          @stripeSandboxWebhook {
-              method POST
-              path /api/platform/v1/billing/stripe/webhook
+            # HI5_STRIPE_SANDBOX_PILOT_START
+            @stripeSandboxWebhook {
+                method POST
+                path /api/platform/v1/billing/stripe/webhook
           }
-          handle @stripeSandboxWebhook {
-              header X-Hi5-Stripe-Sandbox-Test "pilot"
-              reverse_proxy stripeqa-api:3001
-          }
-          # HI5_STRIPE_SANDBOX_PILOT_END
+            handle @stripeSandboxWebhook {
+                header X-Hi5-Stripe-Sandbox-Test "pilot"
+                reverse_proxy stripeqa-api:3001
+            }
+            # HI5_STRIPE_SANDBOX_PILOT_END
         EOF
           fi
           cat >> /gateway-config/Caddyfile <<EOF
-          @testReleaseApi path /api/v1/* /api/*
-          handle @testReleaseApi {
-              reverse_proxy hi5pool-test-unified-acd8e2c2-api:3001
-          }
-          handle {
-              reverse_proxy hi5pool-test-unified-acd8e2c2-web:80
-          }
+            @testReleaseApi path /api/v1/* /api/*
+            handle @testReleaseApi {
+                reverse_proxy hi5pool-test-unified-acd8e2c2-api:3001
+            }
+            handle {
+                reverse_proxy hi5pool-test-unified-acd8e2c2-web:80
+            }
         }
         EOF
         fi
