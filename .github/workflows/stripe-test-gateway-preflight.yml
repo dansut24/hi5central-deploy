@@ -1,0 +1,86 @@
+name: Stripe Test Gateway Preflight
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/prepare-stripe-test-gateway-candidate.sh'
+      - '.github/workflows/stripe-test-gateway-preflight.yml'
+      - 'docs/operations/stripe-sandbox-webhook-gateway.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guarded-render:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: sh -n scripts/prepare-stripe-test-gateway-candidate.sh
+      - name: Test exact-path routing preservation and fail-closed guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/stripe-gateway
+          cat > /tmp/stripe-gateway/active <<'CADDY'
+          {
+            email admin@example.invalid
+          }
+          http://test-api.hi5central.com {
+            reverse_proxy control-server:3001
+          }
+          http://test.hi5central.com {
+            reverse_proxy itsm-web:80
+          }
+          http://testing-test.hi5central.com {
+              # Preserve the existing pilot's original routes
+              @testReleaseApi path /api/v1/* /api/*
+              handle @testReleaseApi {
+                  reverse_proxy hi5pool-test-unified-acd8e2c2-api:3001
+              }
+              handle {
+                  reverse_proxy hi5pool-test-unified-acd8e2c2-web:80
+              }
+          }
+          CADDY
+          export HI5_STRIPE_TEST_GATEWAY_PREFLIGHT=render-only
+          export RUNTIME_ENVIRONMENT=test
+          export COMPOSE_PROJECT_NAME=hi5central-test
+          sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/active /tmp/stripe-gateway/candidate
+          awk '
+            $0 == "    # HI5_STRIPE_SANDBOX_PILOT_START" { skip=1; next }
+            $0 == "    # HI5_STRIPE_SANDBOX_PILOT_END" { skip=0; next }
+            !skip { print }
+          ' /tmp/stripe-gateway/candidate > /tmp/stripe-gateway/restored
+          cmp /tmp/stripe-gateway/active /tmp/stripe-gateway/restored
+          grep -Fq 'method POST' /tmp/stripe-gateway/candidate
+          grep -Fq 'path /api/platform/v1/billing/stripe/webhook' /tmp/stripe-gateway/candidate
+          if sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/active /tmp/stripe-gateway/candidate; then
+            echo 'FAIL: overwrote existing output'; exit 1
+          fi
+          cp /tmp/stripe-gateway/active /tmp/stripe-gateway/unchanged
+          if RUNTIME_ENVIRONMENT=live sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/active /tmp/stripe-gateway/forbidden; then
+            echo 'FAIL: live env allowed'; exit 1
+          fi
+          if COMPOSE_PROJECT_NAME=hi5central-prod sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/active /tmp/stripe-gateway/forbidden; then
+            echo 'FAIL: prod project allowed'; exit 1
+          fi
+          if HI5_STRIPE_TEST_GATEWAY_PREFLIGHT=off sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/active /tmp/stripe-gateway/forbidden; then
+            echo 'FAIL: missing explicit guard allowed'; exit 1
+          fi
+          sed 's/hi5pool-test-unified-acd8e2c2-api:3001/unknown-api:3001/' /tmp/stripe-gateway/active > /tmp/stripe-gateway/drifted
+          if sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/drifted /tmp/stripe-gateway/forbidden; then
+            echo 'FAIL: API upstream drift allowed'; exit 1
+          fi
+          cp /tmp/stripe-gateway/candidate /tmp/stripe-gateway/has-stripe
+          if sh scripts/prepare-stripe-test-gateway-candidate.sh /tmp/stripe-gateway/has-stripe /tmp/stripe-gateway/forbidden; then
+            echo 'FAIL: duplicate Stripe route allowed'; exit 1
+          fi
+          cmp /tmp/stripe-gateway/active /tmp/stripe-gateway/unchanged
+          test ! -e /tmp/stripe-gateway/forbidden
+      - name: Offline validate output using Caddy
+        run: |
+          docker run --rm -i --entrypoint caddy caddy:2-alpine \
+            validate --config /dev/stdin --adapter caddyfile \
+            < /tmp/stripe-gateway/candidate
