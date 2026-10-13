@@ -111,7 +111,62 @@ jobs:
           obj=json.loads(pathlib.Path('/tmp/stripe-ci-compose.json').read_text())
           command=obj['services']['config-init']['command']
           assert isinstance(command,list) and command[:2]==['/bin/sh','-ec'],command[:2]
-          script=command[2]
+          script=command[2].replace('$', '          assert '$STRIPE_TEST_GATEWAY_ROUTING_MODE' in script
+          assert '$COMPOSE_PROJECT_NAME' in script
+          assert '$RUNTIME_ENVIRONMENT' in script
+          pathlib.Path('/tmp/stripe-ci-config-init.sh').write_text(script)
+          PY
+          sh -n /tmp/stripe-ci-config-init.sh
+
+          for mode in baseline webhook; do
+            docker run --rm --network none -i \
+              -e TURN_SHARED_SECRET=ci_synthetic_secret \
+              -e TURN_REALM=hi5central -e ACME_EMAIL=admin@hi5central.com \
+              -e API_ADDRESS=http://test-api.hi5central.com \
+              -e ITSM_ADDRESS=http://test.hi5central.com \
+              -e RMM_ADDRESS=http://test-rmm.hi5central.com \
+              -e ADMIN_ADDRESS=http://test-admin.hi5central.com \
+              -e DOWNLOADS_ADDRESS=http://test-downloads.hi5central.com \
+              -e HELP_ADDRESS= -e RELEASE_TEST_ADDRESSES= -e RELEASE_UAT_ADDRESSES= \
+              -e COMPOSE_PROJECT_NAME=hi5central-test -e RUNTIME_ENVIRONMENT=test \
+              -e STRIPE_TEST_GATEWAY_ROUTING_MODE="$mode" \
+              alpine:3.22 sh -ec \
+                'mkdir /gateway-config /turn-config /run-secrets; sh /dev/stdin; cat /gateway-config/Caddyfile' \
+              < /tmp/stripe-ci-config-init.sh > "/tmp/stripe-ci-$mode.Caddyfile"
+            docker run --rm -i --entrypoint caddy caddy:2-alpine \
+              validate --config /dev/stdin --adapter caddyfile < "/tmp/stripe-ci-$mode.Caddyfile"
+          done
+
+          # The hash is from the effective read-only Test Caddyfile and its
+          # separately captured original VPS backup on 2026-10-13.
+          printf '%s  %s\n' \
+            69d7154bf19e3fcad0d36fe9e4eb91bc52a52bd5d96388d89cfe45cdf31d0882 \
+            /tmp/stripe-ci-baseline.Caddyfile | sha256sum -c -
+
+          # Rollback proof: removing only the Stripe section exactly reproduces
+          # the approved baseline, including all other pinned Test pilot routes.
+          awk '
+            /^    # HI5_STRIPE_SANDBOX_PILOT_START$/ { skip=1; next }
+            /^    # HI5_STRIPE_SANDBOX_PILOT_END$/ { skip=0; next }
+            !skip { print }
+          ' /tmp/stripe-ci-webhook.Caddyfile > /tmp/stripe-ci-rollback.Caddyfile
+          cmp /tmp/stripe-ci-baseline.Caddyfile /tmp/stripe-ci-rollback.Caddyfile
+          grep -Fq 'method POST' /tmp/stripe-ci-webhook.Caddyfile
+          grep -Fq 'path /api/platform/v1/billing/stripe/webhook' /tmp/stripe-ci-webhook.Caddyfile
+          test "$(grep -Fc 'reverse_proxy stripeqa-api:3001' /tmp/stripe-ci-webhook.Caddyfile)" -eq 1
+
+          # Wrong env must exit BEFORE touching even a pre-existing config.
+          if docker run --rm --network none -i \
+              -e STRIPE_TEST_GATEWAY_ROUTING_MODE=webhook \
+              -e COMPOSE_PROJECT_NAME=hi5central-test -e RUNTIME_ENVIRONMENT=live \
+              alpine:3.22 sh -ec \
+                'mkdir /gateway-config /turn-config /run-secrets; printf "PRESERVE\\n" > /gateway-config/Caddyfile; if sh /dev/stdin; then exit 88; fi; grep -qx PRESERVE /gateway-config/Caddyfile' \
+              < /tmp/stripe-ci-config-init.sh; then
+            echo 'Live runtime guard confirmed: no config changed.'
+          else
+            echo 'FAIL: fail-closed guard damaged Caddy config'; exit 1
+          fi
+)
           assert '$STRIPE_TEST_GATEWAY_ROUTING_MODE' in script
           assert '$COMPOSE_PROJECT_NAME' in script
           assert '$RUNTIME_ENVIRONMENT' in script
