@@ -21,7 +21,7 @@ docker run -d --name "$NAME" \
  -e POSTGRES_PASSWORD=ci-only-not-for-production \
  postgres:17-alpine >/dev/null
 for i in $(seq 1 40);do
- if docker exec "$NAME" pg_isready -U hi5central -d hi5central >/dev/null 2>&1;then break;fi
+ if [[ "$(docker exec "$NAME" psql -X -Atqc "SELECT 1" -U hi5central -d hi5central 2>/dev/null || true)" == "1" ]];then break;fi
  sleep 1
 done
 docker exec -i "$NAME" psql -X -v ON_ERROR_STOP=1 -U hi5central -d hi5central <<'SQL'
