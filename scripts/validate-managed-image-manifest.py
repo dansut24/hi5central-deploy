@@ -58,8 +58,12 @@ def validate(manifest):
   digest=entry.get("sha256")
   require(isinstance(digest,str) and HEXDIGEST.fullmatch(digest),
           "Immutable SHA256 required for "+key)
-  require(entry.get("platform_git_sha")==sha,
-          "Native artifact must be tied to exact Platform SHA: "+key)
+  native_source=entry.get("source_git_sha")
+  require(isinstance(native_source,str) and SHA.fullmatch(native_source),
+          "Native artifact needs its own exact source SHA: "+key)
+  # Agent and Viewer channels are independently centrally managed and can
+  # be newer than a tenant's application release. Never pin them to the
+  # Platform application SHA or allow customers to choose older versions.
  approvals=manifest.get("approvals")
  require(isinstance(approvals,dict),"Missing human approval object.")
  for k in ("platform_release_review","managed_infrastructure_review",
