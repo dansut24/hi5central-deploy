@@ -166,7 +166,7 @@ def main():
    "RELEASE_ROLLOUT_PAUSED":"true",
    "APP_URL":"https://"+args.root_domain,
    "MARKETING_URL":"https://"+args.root_domain,
-   "PORTAL_URL":"https://"+args.root_domain+"/portal",
+   "PORTAL_URL":"", # no tenant portal route exists before signup; tenant uses slug-portal domain
    "API_URL":"https://api."+args.root_domain,
    "ADMIN_URL":"https://admin."+args.root_domain,
    "RMM_URL":"https://rmm."+args.root_domain,
