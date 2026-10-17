@@ -184,9 +184,28 @@ snapshots as background intelligence refresh proceeded. All four JSONL
 hashes and record counts passed offline verification. The archive has
 root-only permissions and may include confidential vendor source metadata.
 
-**Both archives are currently only ON THE OLD VPS. They are not off-host and
-the real 1,956-release JSONL has NOT been restored into a fresh copy of the
-complete schema. The reset gate is therefore BLOCKED.** The Python exporter
+**Real archived data restore PASS (isolated):** On the old VPS we created
+a short-lived PostgreSQL 17 container with `--network none`, restored
+a schema-only snapshot of the live production database (200 public tables),
+then imported the real JSONL archive transactionally using the same
+PostgreSQL JSONB record-population strategy as the managed importer.
+Counts matched: catalogue 1,036, vendor sources 811, bindings 812,
+releases 1,956, with zero tenants and devices. The isolated DB was
+removed. This verifies the saved rows against the **current live schema**,
+not yet against the final GitHub-certified full migration output.
+
+A consolidated, checksum-verified on-server archive was also created:
+`/opt/hi5central/reset-recovery/hi5central-catalogue-recovery-20261017.tar.gz`,
+2,778,120 bytes, SHA256
+`9f64449e28970d719512a8ecf33c7f7574d6d1d83cab87114cd7d37e785c242a`.
+It contains both protected data backups, the production schema-only dump
+and a `SHA256SUMS.txt` file. All 3 internal files verified.
+
+**CRITICAL RESET BLOCKER:** The recovery bundle exists **only on the OLD
+IONOS VPS** until securely copied to independent, off-server storage
+and verified there. The real archive should also be imported into a
+fully fresh run of all approved final Platform migrations before the
+installer is certified. Do NOT reset IONOS yet. The Python exporter
 has an explicit `--catalogue-only-without-full-recovery` fallback for
 authorised management relays where the host's separate recovery dump is not
 mounted; its manifest records that full backup verification was not possible
