@@ -40,6 +40,22 @@ if ! docker run --rm --network "$NET" \
  tail -n 85 "$WORK/migration.log" >&2;exit 3
 fi
 echo "PASS: full Platform migration runner completed."
+FIRST_MIGRATION_COUNT="$(docker exec "$NAME" psql -X -Atqc 'SELECT count(*) FROM schema_migrations' -U hi5central -d hi5central)"
+# The official migrator must be safe to rerun on an existing clean schema:
+# no extra migration ledger rows and no extra tenant/customer records.
+docker run --rm --network "$NET" \
+ -v "$(realpath "$API"):/workspace" -w /workspace \
+ -e "DATABASE_URL=postgresql://hi5central:disposable-ci-password@$NAME:5432/hi5central" \
+ node:24-alpine sh -ec 'npm run migrate' >"$WORK/migration-rerun.log" 2>&1 || {
+ echo "BLOCKED: official Platform migration rerun failed" >&2
+ tail -n 70 "$WORK/migration-rerun.log" >&2
+ exit 3
+}
+SECOND_MIGRATION_COUNT="$(docker exec "$NAME" psql -X -Atqc 'SELECT count(*) FROM schema_migrations' -U hi5central -d hi5central)"
+test "$FIRST_MIGRATION_COUNT" = "$SECOND_MIGRATION_COUNT" || {
+ echo "BLOCKED: migration rerun changed migration ledger" >&2;exit 3
+}
+echo "PASS: official Platform migrations are repeatable with identical ledger."
 docker exec -i "$NAME" psql -X -v ON_ERROR_STOP=1 -U hi5central -d hi5central <<'SQL'
 BEGIN READ ONLY;
 DO $h5$
@@ -97,6 +113,26 @@ docker exec "$NAME" psql -X -Atqc \
  "SELECT password_hash FROM users WHERE email='owner@example.invalid'" \
  -U hi5central -d hi5central >"$WORK/owner-hash"
 python3 tests/test_managed_owner_password.py "$WORK/owner-hash" "$WORK/secrets/platform-owner-password"
+# A restore must not overwrite an already bootstrapped fresh deployment.
+# Old migrations and globally preserved software data must remain unchanged.
+set +e
+sudo python3 scripts/import-global-software-catalogue.py \
+ --archive "$WORK/seed.tar.gz" --apply >"$WORK/reimport-rejection.log" 2>&1
+REIMPORT_CODE=$?
+set -e
+test "$REIMPORT_CODE" -ne 0 || {
+ echo "BLOCKED: reimport accepted an existing Platform Owner" >&2;exit 3
+}
+docker exec -i "$NAME" psql -X -v ON_ERROR_STOP=1 -U hi5central -d hi5central <<'SQL'
+DO $h5$ BEGIN
+ IF (SELECT count(*) FROM rmm_software_catalogue)<>1
+ OR (SELECT count(*) FROM rmm_software_vendor_sources)<>1
+ OR (SELECT count(*) FROM platform_admin_members WHERE role='owner')<>1
+ OR (SELECT count(*) FROM tenants)<>0
+ THEN RAISE EXCEPTION 'Rejected reimport changed global catalogue or Admin';END IF;
+END $h5$;
+SQL
+echo "PASS: populated global Admin database rejects catalogue overwrite."
 EDITOR_PASSWORD="$(cat "$WORK/secrets/pgadmin-editor-password")"
 docker exec -i -e "PGPASSWORD=$EDITOR_PASSWORD" "$NAME" \
  psql -h 127.0.0.1 -X -v ON_ERROR_STOP=1 \
