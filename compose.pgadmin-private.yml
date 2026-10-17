@@ -1,0 +1,43 @@
+# REQUIRED in the managed fresh-VPS install; PRIVATE loopback-only pgAdmin.
+# Existing Standard/MSP self-host installs do not enable this overlay.
+# Requires a reviewed, immutable pgAdmin image reference and a private password
+# file. With compose.yml this shares hi5internal but publishes only loopback.
+# Access from your laptop through: ssh -L 5050:127.0.0.1:5050 root@VPS
+# Then browse http://127.0.0.1:5050 (pgAdmin login != database login).
+# Register the PostgreSQL service (port 5432, inside the private Compose
+# network) using a separately provisioned DATABASE-ADMIN identity with full
+# application-table view/edit access, not a cluster superuser or API identity.
+# Fresh bootstrap must verify SELECT/INSERT/UPDATE/DELETE in a disposable
+# table before declaring database administration READY. A separate migration
+# owner role may be needed for ALTER/DDL privileges.
+# Secure pgAdmin web login and PostgreSQL database login are distinct.
+# CRITICAL: Do not expose this UI or port 5432 to a public interface.
+# A managed install must pass --profile database-browser in its Compose invocation.
+#
+# docker compose -f compose.yml -f compose.pgadmin-private.yml \
+#   --profile database-browser up -d pgadmin
+services:
+  pgadmin:
+    profiles: ["database-browser"]
+    image: ${HI5_PGADMIN_IMAGE:?Set reviewed immutable dpage/pgadmin4 image reference}
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${HI5_PGADMIN_EMAIL:?Set private pgAdmin login email}
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_DISABLE_POSTFIX: "1"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "True"
+    secrets:
+      - pgadmin_password
+    ports:
+      - "127.0.0.1:${HI5_PGADMIN_LOCAL_PORT:-5050}:80"
+    networks: [hi5internal]
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+secrets:
+  pgadmin_password:
+    file: ${HI5_PGADMIN_PASSWORD_FILE:?Set absolute path to a mode-600 private pgAdmin secret file}
+volumes:
+  pgadmin_data:

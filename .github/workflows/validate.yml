@@ -16,6 +16,149 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check deployment shell syntax
         run: sh -n install.sh scripts/*.sh
+      - name: Check managed single-command entrypoint syntax and fail closed
+        run: |
+          bash -n install-managed.sh
+          set +e
+          bash install-managed.sh --preflight-install > /tmp/preflight-no-args.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          grep -q 'Require --manifest' /tmp/preflight-no-args.log
+          python3 scripts/validate-managed-image-manifest.py --help >/dev/null
+          set +e
+          bash install-managed.sh --install --admin-email owner@example.invalid > /tmp/h5-install-safety-output 2>&1
+          code=$?
+          set -e
+          test "$code" -eq 3
+          grep -Fq 'NOT READY' /tmp/h5-install-safety-output
+          grep -Fq 'No changes performed' /tmp/h5-install-safety-output
+          rm /tmp/h5-install-safety-output
+      - name: Validate managed clean-rebuild safety tools
+        run: |
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py scripts/render-managed-runtime.py scripts/stage-managed-native-artifacts.py scripts/bootstrap-managed-platform-owner.py scripts/verify-managed-reset-inputs.py
+          bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/export-global-software-catalogue.py').read_text()
+          assert "WHERE c.tenant_id IS NULL" in p
+          for table in ('rmm_software_catalogue','rmm_software_vendor_sources',
+                        'rmm_software_vendor_bindings','rmm_software_vendor_releases'):
+              assert table in p
+          assert "os.replace(pending,final)" in p
+          print('PASS: global software catalogue exporter is allowlisted and atomic')
+          PY
+          python3 -m unittest discover -s tests -p test_global_software_seed.py -v
+          python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
+          python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
+          python3 -m unittest discover -s tests -p test_managed_native_staging.py -v
+          python3 -m unittest discover -s tests -p test_managed_restore_preflight.py -v
+          python3 -m unittest discover -s tests -p test_managed_offsite_backup.py -v
+          bash -n scripts/upload-managed-recovery.sh
+          python3 -m unittest discover -s tests -p test_managed_fresh_host.py -v
+          python3 -m unittest discover -s tests -p test_render_managed_runtime.py -v
+          python3 -m unittest discover -s tests -p test_managed_owner_password.py -v
+      - name: Validate digest-pinned zero-tenant cloud Compose core (NO host deploy)
+        run: |
+          python3 - <<'PY'
+          import sys,json
+          from pathlib import Path
+          sys.path.insert(0,'tests')
+          from test_managed_image_manifest import good_manifest
+          manifest=good_manifest()
+          env={
+           'COMPOSE_PROJECT_NAME':'hi5central-managed','COMPOSE_PROFILES':'itsm,rmm,admin,database-browser',
+           'ROOT_DOMAIN':'hi5central.com','MARKETING_ADDRESS':'hi5central.com',
+           'ITSM_ADDRESS':'hi5central.com','RMM_ADDRESS':'rmm.hi5central.com',
+           'API_ADDRESS':'api.hi5central.com','ADMIN_ADDRESS':'admin.hi5central.com',
+           'DOWNLOADS_ADDRESS':'downloads.hi5central.com',
+           'APP_URL':'https://hi5central.com','MARKETING_URL':'https://hi5central.com',
+           'API_URL':'https://api.hi5central.com','PORTAL_URL':'',
+           'RMM_URL':'https://rmm.hi5central.com','ADMIN_URL':'https://admin.hi5central.com',
+           'DOWNLOADS_URL':'https://downloads.hi5central.com','COOKIE_DOMAIN':'.hi5central.com',
+           'ACME_EMAIL':'administrator@example.invalid','POSTGRES_DB':'hi5central',
+           'POSTGRES_USER':'hi5central','POSTGRES_PASSWORD':'ci-only-not-a-live-password',
+           'REDIS_PASSWORD':'ci-only-not-a-live-redis-password',
+           'MFA_ENCRYPTION_KEY':'a'*64,'RMM_RECOVERY_KEY_ENCRYPTION_KEY':'b'*64,
+           'CONNECT_CODE_HMAC_KEY':'c'*64,'TURN_SHARED_SECRET':'d'*64,
+           'TENANT_INSTALLER_HMAC_KEY':'e'*64,'INITIAL_SETUP_TOKEN':'f'*64,
+           'ROOT_DOMAIN':'hi5central.com','TURN_URL':'turn:turn.hi5central.com:3478',
+           'TURN_HOST':'turn.hi5central.com','TURN_REALM':'hi5central.com',
+           'HI5_PGADMIN_EMAIL':'administrator@example.invalid',
+           'HI5_PGADMIN_LOCAL_PORT':'5050',
+           'HI5_NATIVE_DOWNLOAD_ROOT':'/var/lib/hi5central/native-downloads',
+           'HI5_PGADMIN_PASSWORD_FILE':'/tmp/managed-core-ci-password',
+           'PRIMARY_TENANT_SLUG':'','MANAGED_TENANT_SLUGS':'',
+           'RELEASE_ROLLOUT_PAUSED':'true','BACKGROUND_WORKERS_ENABLED':'false',
+           'TENANCY_MODE':'multi','DEPLOYMENT_MODE':'managed',
+          }
+          for name,image in manifest['images'].items():
+           env['HI5_IMAGE_'+name.upper()]=image
+          env['HI5_PGADMIN_IMAGE']=manifest['images']['pgadmin']
+          Path('/tmp/managed-core-ci.env').write_text(''.join(k+'='+v+'\n' for k,v in env.items()))
+          Path('/tmp/managed-core-ci-password').write_text('ci-private-test-only')
+          PY
+          docker compose -f compose.managed-core.yml -f compose.pgadmin-private.yml \
+            --env-file /tmp/managed-core-ci.env \
+            --profile itsm --profile rmm --profile admin --profile database-browser \
+            config --format json > /tmp/managed-core-compose.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/managed-core-compose.json') as fp:c=json.load(fp)
+          services=c['services']
+          required={'postgres','redis','config-init','agent-deployment-assets',
+                    'migrate','control-server','itsm-web','rmm-web','admin-web',
+                    'marketing-web','turn','gateway','pgadmin'}
+          assert required.issubset(services),required-set(services)
+          assert not (set(services)&{'docs-web','release-executor-live'}),set(services)
+          for name in required:
+           assert '@sha256:' in services[name]['image'],name
+          assert not services['postgres'].get('ports'),'No public Postgres'
+          assert services['pgadmin']['ports'][0]['host_ip']=='127.0.0.1'
+          assert services['pgadmin']['ports'][0]['target']==80
+          assert any('/var/lib/hi5central/native-downloads' in str(m) and '/srv/downloads' in str(m) for m in services['gateway']['volumes']), 'Native downloads must be bound read-only'
+          assert services['control-server']['environment']['TENANCY_MODE']=='multi'
+          assert services['control-server']['environment']['PRIMARY_TENANT_SLUG']==''
+          assert services['control-server']['environment']['BACKGROUND_WORKERS_ENABLED']=='false'
+          cmd=' '.join(services['config-init']['command'])
+          assert 'marketing-web:80' in cmd
+          assert 'slug-portal' not in cmd
+          assert 'No customer DNS routes are seeded' in cmd
+          assert '$MARKETING_ADDRESS' in cmd
+          print('PASS: digest-pinned cloud core, separate marketing, no tenant routes, private pgAdmin')
+          print('NOTE: Compose-only test: not a runnable full managed installer.')
+          PY
+          rm -f /tmp/managed-core-ci.env /tmp/managed-core-ci-password /tmp/managed-core-compose.json
+      - name: Validate fresh PostgreSQL catalogue restore and private editor permissions
+        run: |
+          bash -n tests/smoke_managed_seed_postgres.sh
+          bash tests/smoke_managed_seed_postgres.sh
+          bash -n tests/smoke_managed_owner_postgres.sh
+          bash tests/smoke_managed_owner_postgres.sh
+      - name: Verify private pgAdmin full-edit browser overlay
+        env:
+          HI5_PGADMIN_IMAGE: dpage/pgadmin4:ci-config-only
+          HI5_PGADMIN_EMAIL: administrator@example.invalid
+          HI5_PGADMIN_PASSWORD_FILE: /tmp/pgadmin-ci-password
+          HI5_PGADMIN_LOCAL_PORT: '5050'
+        run: |
+          umask 077
+          printf 'ci-not-used-for-login\n' > /tmp/pgadmin-ci-password
+          docker compose -f compose.yml -f compose.pgadmin-private.yml --env-file environments/prod.env.example --profile database-browser config --format json > /tmp/pgadmin-compose.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/pgadmin-compose.json') as f: config=json.load(f)
+          service=config['services']['pgadmin']
+          ports=service['ports']
+          assert len(ports)==1
+          assert ports[0]['host_ip']=='127.0.0.1',ports
+          assert ports[0]['published']=='5050' or ports[0]['published']==5050
+          assert ports[0]['target']==80
+          assert 'hi5internal' in service['networks']
+          assert 'pgadmin_password' in config['secrets']
+          print('PASS: pgAdmin is private-loopback only and separately authenticated')
+          PY
+          rm /tmp/pgadmin-compose.json /tmp/pgadmin-ci-password
       - name: Validate Standard self-host bootstrap
         env:
           HI5_ROOT_DOMAIN: ci.localhost
@@ -48,3 +191,35 @@ jobs:
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config | grep -q 'RUNTIME_ENVIRONMENT: test'
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config | grep -q 'RUNTIME_ENVIRONMENT: uat'
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config | grep -q 'RUNTIME_ENVIRONMENT: live'
+
+  full-platform-schema-rehearsal:
+    name: Fresh real Platform migrations and catalogue restore
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout managed deployment draft
+        uses: actions/checkout@v4
+      - name: Checkout exact reviewed Platform draft snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: dansut24/Hi5Central-Platform
+          ref: 73e72519e486827e77d9b7cfac8e2655a505a238
+          path: platform
+          persist-credentials: false
+      - name: Verify pinned Platform source SHA
+        run: |
+          test "$(git -C platform rev-parse HEAD)" = "73e72519e486827e77d9b7cfac8e2655a505a238"
+          test -f platform/services/api/src/migrate.js
+          test -f platform/services/api/package-lock.json
+      - name: Verify current managed requester portal hostname contract
+        run: |
+          cd platform/services/api
+          DEPLOYMENT_MODE=managed TENANCY_MODE=multi ROOT_DOMAIN=hi5central.com \
+            node --input-type=module -e "import { tenantUrls } from './src/deploymentConfig.js'; const u=tenantUrls('customer',{rmm:true}); if (u.portalUrl!=='https://customer-portal.hi5central.com' || u.tenantUrl!=='https://customer.hi5central.com' || u.rmmUrl!=='https://customer-rmm.hi5central.com') { console.error(u);process.exit(1) } console.log('PASS: canonical -portal tenant route retained')"
+
+      - name: Rehearse ALL source migrations, global seed and Admin on empty PostgreSQL
+        run: |
+          bash -n tests/smoke_full_platform_schema.sh
+          python3 -m py_compile tests/make_full_schema_seed.py
+          bash tests/smoke_full_platform_schema.sh
