@@ -22,7 +22,9 @@ the host. The strict schema `hi5central-managed-restore-v1` requires:
 - Exactly nine separately verified native/download deliverables: Windows,
   Linux, macOS agent; Windows, Linux, macOS viewer; mobile-compatible
   viewer/web delivery; Avalonia/C# self-service package.
-  Each requires HTTPS download URI, SHA-256 digest and the same source SHA.
+  Each requires HTTPS download URI, SHA-256 digest and its own source Git
+  SHA. Native agent and viewer latest-release channels are **independent**
+  of the version running on a tenant's ITSM/RMM applications.
 - Human review references for the application release, managed infrastructure
   and trusted host dispatcher. A string reference is NOT a cryptographic
   signature or evidence of approvals on its own.
