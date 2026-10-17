@@ -22,7 +22,8 @@ def good_manifest():
   "pgadmin":"docker.io/dpage/pgadmin4@sha256:"+("1"*64),
  })
  native={k:{"status":"verified","url":"https://downloads.hi5central.com/verified/"+k,
-            "sha256":"7"*64,"source_git_sha":"9"*40}
+            "sha256":"7"*64,"source_git_sha":"9"*40,
+            "filename":k+".bin","size_bytes":18}
           for k in m.NATIVE_NAMES}
  return {"schema":"hi5central-managed-restore-v1","deployment_kind":"managed_fresh",
          "platform_git_sha":sha,"tenant_seed_count":0,"release_rollout_paused":True,
@@ -67,6 +68,14 @@ class ManagedManifestTest(unittest.TestCase):
   d["native_artifacts"]["windows_agent"]["source_git_sha"]="f"*40
   d["native_artifacts"]["macos_viewer"]["source_git_sha"]="e"*40
   self.assertTrue(m.validate(d)["validated_metadata_only"])
+ def test_path_traversal_or_unbounded_native_asset_denied(self):
+  for name in ("../secrets","a/b","../../foo",""):
+   d=good_manifest()
+   d["native_artifacts"]["windows_agent"]["filename"]=name
+   with self.assertRaises(ValueError):m.validate(d)
+  d=good_manifest()
+  d["native_artifacts"]["windows_agent"]["size_bytes"]=2*1024*1024*1024
+  with self.assertRaises(ValueError):m.validate(d)
  def test_external_accounts_may_be_skipped(self):
   d=good_manifest()
   self.assertTrue(m.validate(d)["validated_metadata_only"])
