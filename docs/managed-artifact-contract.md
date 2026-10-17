@@ -60,6 +60,31 @@ and no implicit customer DNS routes. This is **NOT proof of application
 startup, working signup, correct Caddy cutover, full platform migrations
 or secure generic worker deployment.** `--install` remains blocked.
 
+## Tenant-independent Global Admin bootstrap — implemented and tested
+
+The managed secrets preparation now creates an additional root-only,
+independently generated `platform-owner-password`. That password is **not**
+distributed in any application container's environment or SQL: the fresh
+owner bootstrap derives the same `scrypt$16384$8$1$...` format used by the
+Platform API's password verifier. The password is never displayed in logs.
+
+`scripts/bootstrap-managed-platform-owner.py` provisions the initial
+`users`, `platform_admin_members(role='owner',status='active')` and
+`platform_admin_audit_events` records in **one database transaction**.
+It rejects non-empty customer tenants, any pre-existing user, existing
+release jobs, unpaused rollout, missing required Platform migration, wrong
+Docker Compose project, or publicly exposed PostgreSQL. It creates **zero**
+tenant rows or tenant memberships. A second invocation is refused.
+
+`install-managed.sh --bootstrap-owner` exposes this operation only after
+fresh managed migrations exist. It is a building block for the eventual
+automatic one-command `--install`, which still refuses execution.
+Disposable PostgreSQL 17 CI tests prove owner registration, creation audit,
+correct scrypt password derivation and the refusal to bootstrap twice.
+
+**Not yet proven:** real complete-schema startup, web sign-in session and
+MFA setup. These remain mandatory before proclaiming the installer READY.
+
 ## Known gaps in the existing source
 
 | Existing source | Discovered difference | Required work before READY |
