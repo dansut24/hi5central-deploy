@@ -85,6 +85,50 @@ correct scrypt password derivation and the refusal to bootstrap twice.
 **Not yet proven:** real complete-schema startup, web sign-in session and
 MFA setup. These remain mandatory before proclaiming the installer READY.
 
+## Full Platform PostgreSQL migration-and-restore rehearsal — CI passing
+
+The draft deployment validation now checks out the **exact** Platform
+source commit `73e72519e486827e77d9b7cfac8e2655a505a238` into a
+disposable GitHub Actions worker. That source SHA is a **draft test
+snapshot**, not a Production-approved release. It executes the real
+`services/api/src/migrate.js` migration runner against PostgreSQL 17
+on an isolated Docker network, with no published PostgreSQL host port.
+
+`tests/smoke_full_platform_schema.sh` proves all of the following:
+
+1. The complete Platform SQL migrations apply on a new PostgreSQL instance,
+   no old users or tenants are seeded, and global release rollout is paused.
+2. Executing the official migration runner a second time leaves the
+   migration ledger unchanged (idempotent schema application).
+3. A synthetic global-only software catalogue/source/binding/release bundle
+   is **generated from actual migrated PostgreSQL rows with real column
+   defaults**; synthetic source inserts run in a transaction that is
+   rolled back before the restore test begins.
+4. The existing four-table catalogue importer restores into the real schema
+   transactionally. The real registered tenant count remains zero.
+5. The independent global Platform Owner is created, audited and verified
+   with the API-compatible scrypt password format, still with zero tenants.
+6. A real PostgreSQL password-authenticated database editor connection
+   creates/reads/updates/deletes an isolated throwaway table.
+7. Re-importing the catalogue after owner creation is refused and the
+   catalogue and Admin record remain unchanged.
+
+**Passed:** <https://github.com/dansut24/hi5central-deploy/actions/runs/39040539952>
+
+These are much stronger database acceptance checks than the original CI
+miniature fixtures. They **do not** prove that real Production catalogue data
+will import (that private export has not yet been run/verified) or that a
+complete Platform API, web Admin, Caddy or marketing container starts.
+Actual IONOS installation remains blocked until full-stack acceptance.
+
+**Routing discrepancy identified:** Current
+`Hi5Central-Platform/services/api/src/deploymentConfig.js` emits
+`customer-portal.hi5central.com` in `tenantUrls().portalUrl`, whereas the
+approved URL contract requires `customer.hi5central.com/portal`.
+This needs a reviewed Platform code fix, route test and Caddy alignment
+before Production marketing/signup and tenant provisioning are ready.
+Do not silently change customer URLs in a database migration.
+
 ## Known gaps in the existing source
 
 | Existing source | Discovered difference | Required work before READY |
