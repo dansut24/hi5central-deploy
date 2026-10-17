@@ -9,10 +9,13 @@ the complete managed-platform bootstrap. A separate, fully integrated
 
 One supported, immutable, signed/approved Platform release SHA + its compatible
 public deployment manifest. Starting on clean Ubuntu with Docker Compose,
-one operator command (after supplying DNS, email, approved images and private
-secrets) installs ALL infrastructure and platform services, registers a fresh
-platform administrator, and performs smoke tests. It must **not** reuse
-host-tweaked Caddy routes, stale env files or the current database by default.
+one operator command provisions the core platform with a new database,
+restores the verified global software catalogue and vendor sources, creates
+the initial platform administrator, and performs core smoke checks. It must
+start with **zero tenants**. External SMTP, billing, DNS, device signers and
+Windows qualification endpoints can be registered after setup (or skipped),
+without pretending that unconfigured features are operational. It must **not**
+reuse host-tweaked Caddy routes, stale env files or the old database.
 
 Required service inventory:
 - Marketing/site, shared authentication and onboarding; ITSM workspace and
@@ -40,8 +43,12 @@ Required service inventory:
   fenced job leases, isolated host deployment authority, release notes,
   audit history and safe rollback.
 - Backups, scheduled backup validation, metrics/health and alerting.
-- **Optional** loopback-only pgAdmin via `compose.pgadmin-private.yml`, not an
-  unauthenticated public website.
+- **Required private database browser:** pgAdmin via `compose.pgadmin-private.yml`
+  installed by the managed bootstrap, listening on loopback only and reachable
+  through authenticated SSH port forwarding/VPN. Provide a separate PostgreSQL
+  database-admin login with **full application-data editing** (view/insert/
+  update/delete, and authorised schema maintenance) restricted to the new
+  Hi5Central database. It must not expose pgAdmin/5432 to the Internet.
 
 No module silently disappears on a fresh install, even if it currently runs
 as a manually created container. RMM is **single Live workspace** (no RMM
@@ -122,8 +129,9 @@ public GitHub.
    qualification runner and release workers. Never silently use :latest in
    Production or mix releases across components.
 6. Test syntax, Compose config, fresh DB migrations, restore, job queues,
-   Caddy routing, TURN connectivity, RMM devices, 10 tenant automation and
-   failed/rollback paths in a disposable install before protected merge.
+   Caddy routing, core startup, pgAdmin private access and real writable DB
+   permissions, backup/restore, and restart/idempotency in a disposable install.
+   No tenants or ten-tenant rollout are required for a clean reinstall.
 
 ## Database cleanup and reset policy
 
@@ -154,42 +162,56 @@ separate operator action referencing host identity, backup digest and the
 approved deployment/change ID. This document and the optional pgAdmin overlay
 DO NOT PERFORM A WIPE OR DROP/DELETE ANY DATABASE OBJECTS.
 
-**Browser database access:** optional pgAdmin, bound to 127.0.0.1 only.
-Connect via SSH port forwarding or a private VPN; use separate pgAdmin login
-and a distinct read-only PostgreSQL role. Never connect via a PostgreSQL
-superuser from the web UI or open 5432/5050 publicly. Read-only means no
-DDL/DML credentials; role grants (including future partitions/RLS) require
-independent security review.
+**Browser database access:** pgAdmin is a required managed-install component,
+bound to `127.0.0.1` only. It is accessible via SSH tunnel/VPN with a distinct
+pgAdmin web login AND a separate Hi5Central database-admin login. The
+PostgreSQL login has full application-table read/write privileges (SELECT,
+INSERT, UPDATE, DELETE, applicable sequences) and reviewed schema-management
+privileges within the fresh application database. **No cluster SUPERUSER**,
+`BYPASSRLS`, `CREATEROLE`, or public/guest connection. For existing or
+future tables, default privileges/grant ownership need verification in CI;
+full row editing must be demonstrated in a disposable database. Schema
+changes may require owner/migration credentials, stored separately.
+Do not open PostgreSQL port 5432 or pgAdmin port 5050 to the public Internet.
+Database editing bypasses some application workflows and should require
+backup-before-change and privileged-access audit; never let this admin login
+serve customer API or unattended release-worker connections.
 
-## Actual ten-tenant acceptance before general automation
+## Clean-install acceptance: ZERO tenants
 
-1. Secure privileged Docker host operator: no database superuser/Docker socket
-   in generic planner/stage workers; explicit tenant+stage+fence+window+SHA
-   permit at DB claim AND trusted host dispatch; no UAT→Live bypass.
-2. Full migration reconciliation 155–169 under controlled review,
-   independently verified role grants and backfill; preserve global pause.
-3. Resolve Caddy **host file vs mounted file vs active config** drift, test
-   cutover and rollback without weakening isolation.
-4. Provision 10 *real* tenants through regular signup/onboarding: five Managed,
-   five Custom, two also RMM. Verify MFA, roles, email, licensed modules and
-   unique per-tenant windows; explicitly admit ONLY these 10 to pilot scope.
-5. Certify Dev build and publish release notes; auto-discover/queue Test for 10.
-   Verify designated two-Test-canary gate and per-tenant Test host proof.
-   Managed Live moves in its own window; Custom UAT is auto-staged; Custom
-   Live waits for exact customer acceptance and their approved window.
-6. Verify device enrollment/online status, TURN relays and RMM agent update
-   on the two RMM tenants independently of ITSM UAT/Test rollout. In addition,
-   reconnect a dedicated Windows qualification agent, enable qualification
-   dispatch explicitly, prove a harmless test qualification job and its
-   cleanup, and ensure failed/slow jobs are reviewed before requeueing.
-7. Verify all 10 exact SHA routes, per-tenant audit logs, dry-run,
-   repeat scheduler idempotence, pause/revoke, failed upgrade, rollback,
-   backup restore, host restart/recovery, and no cross-tenant leakage.
-8. Only after independent acceptance + host security review, authorize
-   `all_onboarded` admission. Any **new real ITSM tenant** completing
-   onboarding is discovered on subsequent certified release scans, with
-   Managed/Custom policy still honoured. RMM-only is never queued for ITSM
-   releases.
+The fresh VPS must install **all core capabilities**, restore global software
+catalogue/vendor source data into a freshly migrated database, bootstrap a
+new global Admin identity, confirm configuration/health, and start with exactly
+**zero tenants**, zero ITSM tickets and zero RMM device/agent/rollout records.
+Application release automation starts in a safe, paused/approval-gated state.
+The previous ten-tenant QA exercise is **separate later work**, not an
+acceptance condition for resetting and reinstalling a blank platform.
+
+Features requiring outside credentials or real devices are **installed but
+configurable later**, with explicit status and no misleading success flag:
+- SMTP: skip credentials initially; account verification/password reset must
+  report not configured until an end-to-end mail check passes.
+- Stripe or other payments: billing schema/tenant Admin remains available but
+  no live charges or Stripe webhooks activate until configured.
+- Windows qualification RMM device: server queue/catalogue retained; runner
+  can be enrolled after reset and dispatch starts disabled until verified.
+- Agent/viewer signing, publishing and remote mobile viewer: keep packages,
+  endpoints and build manifest; verify actual artifacts when supplied.
+- Public DNS/TLS and external TURN relay: retain Caddy/TURN services and
+  templates. Report required DNS/network steps where not configured.
+- Other optional integrations: no credentials are silently fabricated.
+- pgAdmin is **not optional for the final managed setup**: the private
+  database browser must support full row editing, with no Internet exposure.
+
+Use independent readiness reports for core services and integrations, e.g.
+CORE READY, SMTP NOT CONFIGURED, PAYMENTS SKIPPED, QUALIFICATION SKIPPED,
+TURN EXTERNAL CHECK PENDING. An unavailable optional external dependency
+must not fail a successfully installed core service.
+
+There is no requirement to create ten tenants—or any tenant—to prove a fresh
+installation. Test automated onboarding/upgrades later with whichever
+legitimately created tenants are available, after independently reviewing
+security, deployment permissions and rollback.
 
 ## One-command installer acceptance criteria (not yet implemented)
 
@@ -204,9 +226,10 @@ It must show a plan and block destructive or irreversible steps until
 privately reviewed, support `--dry-run`, generate missing secrets without
 displaying them, check DNS/TLS/Docker/resources/firewall/backup, pin images,
 provision roles and database migrations, install all required services,
-validate smoke tests and 10-tenant readiness, and create a rollback/runbook
-report. If the software qualification scheduler/schema, a reachable
-configured Windows qualification runner for full acceptance, trusted host
-executor, security tests or TURN verification is missing, full
-`--verify` MUST report BLOCKED;
-do not claim success from 'containers running' alone.
+validate core service health, zero-tenant state, private pgAdmin login and
+full database record editing against a temporary test table, and create a
+rollback/runbook report. Missing OPTIONAL external credentials/devices must
+be flagged `SKIPPED`/`NOT CONFIGURED`, not treated as a core install failure.
+Missing mandatory code, migration, core infrastructure or safe installer
+permissions remains a hard failure. Do not claim success from 'containers
+running' alone.
