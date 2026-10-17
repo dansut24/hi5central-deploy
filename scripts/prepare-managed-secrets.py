@@ -160,6 +160,7 @@ def main():
    "HI5_PGADMIN_PASSWORD_FILE":str(root/"pgadmin-password"),
    "HI5_PGADMIN_EDITOR_PASSWORD_FILE":str(root/"pgadmin-editor-password"),
    "HI5_PGADMIN_LOCAL_PORT":"5050",
+   "HI5_NATIVE_DOWNLOAD_ROOT":"/var/lib/hi5central/native-downloads",
    "HI5_PGADMIN_IMAGE":"", # immutable approved digest supplied by image manifest
    "HI5_INTERNAL_RELEASE_SIGNING_PRIVATE_KEY_FILE":str(signing_key),
    "HI5_INTERNAL_RELEASE_SIGNING_PUBLIC_KEY_FILE":str(pub),
