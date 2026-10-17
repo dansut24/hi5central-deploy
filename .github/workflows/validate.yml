@@ -179,3 +179,29 @@ jobs:
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config | grep -q 'RUNTIME_ENVIRONMENT: test'
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config | grep -q 'RUNTIME_ENVIRONMENT: uat'
           docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config | grep -q 'RUNTIME_ENVIRONMENT: live'
+
+  full-platform-schema-rehearsal:
+    name: Fresh real Platform migrations and catalogue restore
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout managed deployment draft
+        uses: actions/checkout@v4
+      - name: Checkout exact reviewed Platform draft snapshot
+        uses: actions/checkout@v4
+        with:
+          repository: dansut24/Hi5Central-Platform
+          ref: 73e72519e486827e77d9b7cfac8e2655a505a238
+          path: platform
+          persist-credentials: false
+      - name: Verify pinned Platform source SHA
+        run: |
+          test "$(git -C platform rev-parse HEAD)" = "73e72519e486827e77d9b7cfac8e2655a505a238"
+          test -f platform/services/api/src/migrate.js
+          test -f platform/services/api/package-lock.json
+      - name: Rehearse ALL source migrations, global seed and Admin on empty PostgreSQL
+        run: |
+          bash -n tests/smoke_full_platform_schema.sh
+          python3 -m py_compile tests/make_full_schema_seed.py
+          bash tests/smoke_full_platform_schema.sh
