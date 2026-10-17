@@ -30,6 +30,7 @@ jobs:
           assert "os.replace(pending,final)" in p
           print('PASS: global software catalogue exporter is allowlisted and atomic')
           PY
+          python3 -m unittest discover -s tests -p test_global_software_seed.py -v
       - name: Validate Standard self-host bootstrap
         env:
           HI5_ROOT_DOMAIN: ci.localhost
