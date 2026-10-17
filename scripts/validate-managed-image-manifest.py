@@ -14,7 +14,7 @@ import sys
 IMAGE_NAMES=(
  "api","itsm","rmm","admin","marketing","agent_deployment_assets",
  "release_planner","release_executor","protected_host_dispatcher",
- "postgres","redis","caddy","turn","pgadmin",
+ "postgres","redis","caddy","turn","pgadmin","config_init",
 )
 PLATFORM=("api","itsm","rmm","admin")
 NATIVE_NAMES=(
