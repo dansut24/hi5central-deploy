@@ -43,6 +43,10 @@ jobs:
           PY
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
           python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
+      - name: Validate fresh PostgreSQL catalogue restore and private editor permissions
+        run: |
+          bash -n tests/smoke_managed_seed_postgres.sh
+          bash tests/smoke_managed_seed_postgres.sh
       - name: Verify private pgAdmin full-edit browser overlay
         env:
           HI5_PGADMIN_IMAGE: dpage/pgadmin4:ci-config-only
