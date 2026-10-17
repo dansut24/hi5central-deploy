@@ -1,0 +1,35 @@
+# OPTIONAL local-only PostgreSQL inspection, not an Internet service.
+# Requires a reviewed, immutable pgAdmin image reference and a private password
+# file. With compose.yml this shares hi5internal but publishes only loopback.
+# Access from your laptop through: ssh -L 5050:127.0.0.1:5050 root@VPS
+# Then browse http://127.0.0.1:5050 (pgAdmin login != database login).
+# Register "postgres" port 5432 with a separately provisioned READ-ONLY
+# PostgreSQL identity; never reuse POSTGRES_USER / database superuser.
+#
+# docker compose -f compose.yml -f compose.pgadmin-private.yml \
+#   --profile database-browser up -d pgadmin
+services:
+  pgadmin:
+    profiles: ["database-browser"]
+    image: ${HI5_PGADMIN_IMAGE:?Set reviewed immutable dpage/pgadmin4 image reference}
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${HI5_PGADMIN_EMAIL:?Set private pgAdmin login email}
+      PGADMIN_DEFAULT_PASSWORD_FILE: /run/secrets/pgadmin_password
+      PGADMIN_DISABLE_POSTFIX: "1"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "True"
+    secrets:
+      - pgadmin_password
+    ports:
+      - "127.0.0.1:${HI5_PGADMIN_LOCAL_PORT:-5050}:80"
+    networks: [hi5internal]
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+
+secrets:
+  pgadmin_password:
+    file: ${HI5_PGADMIN_PASSWORD_FILE:?Set absolute path to a mode-600 private pgAdmin secret file}
+volumes:
+  pgadmin_data:
