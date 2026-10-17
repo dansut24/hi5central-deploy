@@ -49,6 +49,56 @@ Test/UAT tenant portals); ITSM Managed gets Live + Test, Custom gets Live +
 Test + UAT. All environments share authorised identity but use independent
 release gates.
 
+## Approved retention scope — fresh platform, preserve RMM software intelligence
+
+The requested destination is a **new empty PostgreSQL installation**, not an
+import of legacy tenants. ITSM records, old user accounts and sessions, six
+QA tenants, RMM devices, enrollment tokens, agent jobs, device/session/patch
+history, release jobs, Test/UAT approvals and 161 historical qualification
+review records can be **absent from the new database**. The original full
+Production backup and audit trail must be preserved separately until verified
+new infrastructure and software catalogue are accepted.
+
+Preserve the **global software catalogue and its source data** in a separate
+restricted-permission seed export, currently comprising:
+
+1. `rmm_software_catalogue` where `tenant_id IS NULL` (global entries,
+   including qualification/version/trust metadata). Strip former user foreign
+   keys: `created_by_user_id`, `updated_by_user_id`,
+   `qualified_by_user_id` when preparing data.
+2. `rmm_software_vendor_sources` (configured global vendor feeds).
+3. `rmm_software_vendor_bindings` (source-to-product mappings).
+4. `rmm_software_vendor_releases` (release versions, downloads, hashes,
+   trust/source payloads and evidence).
+
+`scripts/export-global-software-catalogue.py` produces a consistent,
+single-query, read-only JSONL seed archive with SHA-256 manifest and exact row
+counts. It does **not** create tenants, retain ticket/device records, alter
+Production, or import the data. The exporter requires the known verified full
+recovery dump and MUST be tested by a separate checked importer in an
+isolated, fresh, migrated PostgreSQL database before any wipe.
+
+The new install **must not restore** tenant-specific `rmm_tenant_vendor_sources`
+or vendor releases: those belong to accounts being intentionally discarded.
+`rmm_vulnerabilities`, `rmm_vulnerability_products`, OUI and other public
+vulnerability/reference intelligence may be repopulated from canonical
+upstream feeds after verified sync/seed jobs. Since these tables account for
+most current database storage, leaving them out of the fresh seed avoids
+cloning obsolete QA intelligence; preserve source config and exact metadata
+needed to rebuild. Confirm importer/upstream availability before approving
+the destructive cutover. No blanket `TRUNCATE`, `DROP`, or PostgreSQL
+volume removal on the existing VPS is part of this plan.
+
+**Trust:** Existing `qualified` flags and installer URLs are historical
+evidence, NOT an exemption from new patch/installer verification. The
+dedicated Windows qualification agent must be newly registered and revalidated
+after the rebuild, because its device identity intentionally does not migrate.
+
+The export archive might include credential-bearing source metadata or
+private source URLs. Protect it as a secret, copy it off-host securely, and
+review sensitive fields before importing. Do not check JSONL or archives into
+public GitHub.
+
 ## GitHub repository cleanup BEFORE any reset
 
 1. Pick one authoritative source of each component in
@@ -87,8 +137,9 @@ PostgreSQL. Restore of a DB backup alone does NOT prove all these survive.
 
 **Fresh install:** create NEW PostgreSQL data volume. Apply reviewed canonical
 migrations exactly once in order; assert schema_migrations is consistent,
-constraints valid, required indexes/triggers/RLS present. Seed only the
-platform owner/roles, version metadata, global release pause=true, required
+constraints valid, required indexes/triggers/RLS present. Seed the reviewed global software catalogue/vendor source export as a
+separately validated post-migration step, then create only the platform
+owner/roles, version metadata, global release pause=true, required
 environment defaults and intentionally empty tenant state. Do not carry
 QA26 tenant rows, old release jobs, test Stripe subscriptions, stale sessions,
 expired tokens, audit-event spam or CI credentials into the NEW database.
