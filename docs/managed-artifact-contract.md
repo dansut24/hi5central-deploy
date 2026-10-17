@@ -19,7 +19,7 @@ the host. The strict schema `hi5central-managed-restore-v1` requires:
   Admin, marketing/signup, deployment agent assets, certified release
   planner, stage executor, **protected host dispatcher**, PostgreSQL,
   Redis, Caddy, coturn/TURN, and private pgAdmin.
-- Exactly nine separately verified native/download deliverables: Windows,
+- Exactly eight separately verified native/download deliverables: Windows,
   Linux, macOS agent; Windows, Linux, macOS viewer; mobile-compatible
   viewer/web delivery; Avalonia/C# self-service package.
   Each requires HTTPS download URI, SHA-256 digest and its own source Git
@@ -144,6 +144,61 @@ with collision protection and correct TLS/Caddy ownership.
 | pgAdmin Compose override | Private loopback port and test DB editor account have passed syntax/fixture checks | Verify real pgAdmin web login and full app table DML, ensure least privilege in new full-schema database |
 | Initial secret generation | `--prepare` generates internal secrets without overwriting old ones | Map ALL application environment keys, rotation, signing/public-key distribution and encrypted off-host recovery into full installer |
 | Backups and recovery | Old VPS backup previously restored successfully; fresh managed bootstrap not yet exercised | Prove new volume backups, recovery, installer rerun/idempotency and notification status with no tenants |
+
+## Native package and live catalogue recovery evidence (2026-10-17)
+
+The draft restore now has a **SHA-verified, atomic native asset staging**
+component `scripts/stage-managed-native-artifacts.py`. A complete approved
+manifest declares all eight cross-platform deliverables with exact
+`filename`, `size_bytes`, `sha256`, `source_git_sha` and source URI.
+The staging script checks every byte from an offline approved source
+directory, refuses symlinks, unknown/missing/tampered files and inconsistent
+active releases, and publishes the full set under
+`/var/lib/hi5central/native-downloads/releases/<manifest-hash>/` with
+a `latest.json` pointer. Caddy mounts that root read-only. Agents and
+viewers remain on independent centrally managed latest release channels.
+It does **not** fabricate missing Windows/macOS/Linux signed binaries.
+
+The preparatory CLI `install-managed.sh --stage-native-assets` can stage a
+complete reviewed offline package collection; it is not yet wired into
+a working end-to-end `--install`. Tested with synthetic byte fixtures.
+
+**Live read-only audit/export via authorised VPS management relay:**
+the primary Postgres database had **1,036** global software catalogue
+records, **811** vendor sources, **812** vendor bindings and initially
+**1,954** vendor releases. A catalog-only `pg_dump -Fc --data-only`
+was created on the old server in
+`/opt/hi5central/reset-recovery/catalogue/hi5central-global-software-20261017.pgdump`
+(SHA256
+`6a2b687155d25ee6900d4afc19304a4c08d9b61d9d912e73e6f50a020e55a207`).
+It successfully decoded all four tables without application.
+
+The importer-compatible JSONL bundle was also exported on the same VPS
+at
+`/opt/hi5central/reset-recovery/catalogue/global-software-seed-20261017T145713Z.tar.gz`
+(SHA256
+`703e8ff299eaf1d4e5b7da6d280882c73607a5ceeefa1c9baab43be8b2766b1c`).
+The consistency snapshot has **1,036** catalogue, **811** sources,
+**812** bindings and **1,956** releases; two new releases arrived between
+snapshots as background intelligence refresh proceeded. All four JSONL
+hashes and record counts passed offline verification. The archive has
+root-only permissions and may include confidential vendor source metadata.
+
+**Both archives are currently only ON THE OLD VPS. They are not off-host and
+the real 1,956-release JSONL has NOT been restored into a fresh copy of the
+complete schema. The reset gate is therefore BLOCKED.** The Python exporter
+has an explicit `--catalogue-only-without-full-recovery` fallback for
+authorised management relays where the host's separate recovery dump is not
+mounted; its manifest records that full backup verification was not possible
+in that process. This is an export-only permission, not an exception to the
+off-host backup requirement.
+
+Before IONOS reset the operator must securely copy both archives to
+independent storage, validate SHA256, restore the JSONL into the official
+fresh full migration schema in an isolated environment, and check that
+the global counts/source relationships match the saved evidence. DO NOT
+commit these vendor catalogues into the public Git repositories or expose
+the backup folder through Caddy.
 
 ## Full restore acceptance on clean Ubuntu
 
