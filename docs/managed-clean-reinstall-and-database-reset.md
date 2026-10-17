@@ -213,6 +213,51 @@ installation. Test automated onboarding/upgrades later with whichever
 legitimately created tenants are available, after independently reviewing
 security, deployment permissions and rollback.
 
+## IONOS-owned reset and automated credential restoration
+
+The **owner will reset Ubuntu via the IONOS control panel after we confirm
+the installer is complete and independently validated**. This repository
+must never contain a VPS wipe, disk repartition, force-delete or Docker
+prune step. The installer then rebuilds the application and database using
+a NEW independent configuration.
+
+A single managed restore command will:
+1. Generate entirely new root-only database, Redis, MFA, recovery, agent
+   onboarding, TURN, internal release/operator, session, initial setup,
+   pgAdmin web login and independent database editor passwords, plus
+   internal Ed25519 release-signing key pair. Never reuse old live secrets.
+2. Prepare private `/etc/hi5central/managed/` secret storage with mode
+   0700 directory / 0600 credential files. Refuse existing/partial
+   configuration, never print a password, and require protected off-host
+   recovery copies before deleting the original machine.
+3. Pull one approved immutable image set and apply canonical migrations
+   to an **empty** new PostgreSQL database; initial global rollout paused,
+   no pre-created customer tenants, tickets, RMM devices or jobs.
+4. Import and validate the exported global software catalogue/vendor
+   sources. A fresh-DB importer operates transactionally and refuses any
+   existing tenant/user, RMM device, qualification job, release job or
+   unpaused rollout.
+5. Launch a private loopback-only pgAdmin browser with distinct web/DB
+   credentials and a dedicated non-superuser `hi5_pgadmin_editor` account
+   granting full app record CRUD, sequence access and controlled CREATE.
+   Protected row-level policies and DDL ownership rules still apply.
+6. Set up marketing/signup, ITSM/Portal, RMM/Control, Admin, Hi5Dev,
+   Caddy/TURN, download/agent/viewer assets, safe release workers and
+   restore/backup checks. External SMTP, Stripe, code-signing certificates,
+   DNS/relay proof and Windows qualifier can be added later or skipped.
+
+**Implemented in draft PR only:** `install-managed.sh` with safe
+`--dry-run`, `--prepare` and `--verify-secrets`; the preparation
+module, transactionally guarded catalogue importer and limited pgAdmin
+DB-editor provisioning. Disposable PostgreSQL CI verifies accepted import,
+editor SELECT/INSERT/UPDATE/DELETE and rejection on nonempty databases.
+
+**Not implemented:** Actual `--install` activation and full managed image,
+network/routing, bootstrap and host-worker startup. `--install`
+intentionally refuses execution. This draft is **not evidence** that the
+IONOS reset is ready. The installer will be marked ready only after it
+can deploy end-to-end from a clean Ubuntu VPS and pass all core checks.
+
 ## One-command installer acceptance criteria (not yet implemented)
 
 The future command should behave like:
