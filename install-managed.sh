@@ -14,6 +14,7 @@ ADMIN_EMAIL=""
 ACTION=""
 CATALOGUE=""
 MANIFEST=""
+NATIVE_SOURCE=""
 usage(){
  cat <<'EOF'
 Usage:
@@ -25,6 +26,7 @@ Usage:
   sudo ./install-managed.sh --render-core --manifest /private/reviewed-release.json
   sudo ./install-managed.sh --verify-core-compose
   sudo ./install-managed.sh --bootstrap-owner
+  sudo ./install-managed.sh --stage-native-assets --manifest FILE --native-source-dir DIR
   sudo ./install-managed.sh --install --admin-email ADMIN@DOMAIN --catalogue PATH
 
 STATUS: Only non-deploying preflight and secret preparation are implemented so far.
@@ -47,13 +49,14 @@ EOF
 }
 while (($#));do
  case "$1" in
- --dry-run|--prepare|--verify-secrets|--check-manifest|--fresh-host-preflight|--render-core|--verify-core-compose|--bootstrap-owner|--install)
+ --dry-run|--prepare|--verify-secrets|--check-manifest|--fresh-host-preflight|--render-core|--verify-core-compose|--bootstrap-owner|--stage-native-assets|--install)
    if [[ -n "$ACTION" ]];then echo "Choose exactly one action." >&2;exit 2;fi
    ACTION="$1";shift;;
  --admin-email) ADMIN_EMAIL="$2";shift 2;;
  --root-domain) DOMAIN="$2";shift 2;;
  --catalogue) CATALOGUE="$2";shift 2;;
  --manifest) MANIFEST="$2";shift 2;;
+ --native-source-dir) NATIVE_SOURCE="$2";shift 2;;
  --secret-dir) SECRET_DIR="$2";shift 2;;
  --help|-h) usage;exit 0;;
  *) echo "Unknown option: $1" >&2;usage >&2;exit 2;;
@@ -112,6 +115,17 @@ case "$ACTION" in
   python3 "$ROOT_DIR/scripts/prepare-managed-secrets.py" --root "$SECRET_DIR" --verify
   python3 "$ROOT_DIR/scripts/bootstrap-managed-platform-owner.py" --root "$SECRET_DIR" --apply
   echo "Owner bootstrap complete; core installation and MFA verification still required."
+  ;;
+ --stage-native-assets)
+  [[ $EUID -eq 0 ]] || { echo "Run as root on the fresh Ubuntu VPS." >&2;exit 1;}
+  [[ -n "$MANIFEST" && -n "$NATIVE_SOURCE" ]] || {
+    echo "--manifest FILE and --native-source-dir DIR are required." >&2;exit 2;
+  }
+  python3 "$ROOT_DIR/scripts/check-managed-fresh-host.py"
+  python3 "$ROOT_DIR/scripts/stage-managed-native-artifacts.py" \
+    --manifest "$MANIFEST" --source-dir "$NATIVE_SOURCE" \
+    --destination /var/lib/hi5central/native-downloads --apply
+  echo "Native assets staged; not evidence of complete app startup."
   ;;
  --install)
   echo "BLOCKED: full Hi5Central managed installer is NOT READY." >&2
