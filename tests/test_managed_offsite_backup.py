@@ -15,9 +15,9 @@ S3="s3://hi5central-private-recovery/pre-reset/"
 
 def create_fixture(path):
  records={
-  "global-software-seed-20261017T145713Z.tar.gz":b"t"*3000,
-  "hi5central-global-software-20261017.pgdump":b"p"*3000,
-  "production-schema-20261017.pgdump":b"s"*3000,
+  "global-software-seed-20261017T145713Z.tar.gz":os.urandom(4000),
+  "hi5central-global-software-20261017.pgdump":os.urandom(4000),
+  "production-schema-20261017.pgdump":os.urandom(4000),
  }
  sums="".join(hashlib.sha256(v).hexdigest()+"  "+k+"\n" for k,v in records.items())
  records["SHA256SUMS.txt"]=sums.encode()
