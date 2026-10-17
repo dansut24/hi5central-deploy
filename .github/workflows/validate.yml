@@ -19,6 +19,7 @@ jobs:
       - name: Check managed single-command entrypoint syntax and fail closed
         run: |
           bash -n install-managed.sh
+          python3 scripts/validate-managed-image-manifest.py --help >/dev/null
           set +e
           bash install-managed.sh --install --admin-email owner@example.invalid > /tmp/h5-install-safety-output 2>&1
           code=$?
@@ -29,7 +30,7 @@ jobs:
           rm /tmp/h5-install-safety-output
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
@@ -43,6 +44,7 @@ jobs:
           PY
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
           python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
+          python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
       - name: Validate fresh PostgreSQL catalogue restore and private editor permissions
         run: |
           bash -n tests/smoke_managed_seed_postgres.sh
