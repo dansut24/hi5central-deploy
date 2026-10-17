@@ -1,0 +1,419 @@
+# Hi5Central managed fresh cloud CORE — derived from:
+# Hi5Central-Cloud @ b4eb84434005586f0a69f03e955a88bf2e962a3e
+# NO tenant data or hardcoded customer; no floating container tags.
+# This covers base infrastructure ONLY. Generic workers/Hi5Dev/tenant DNS
+# provisioning remain BLOCKED pending reviewed protected host dispatcher.
+# NEVER confuse 'docker compose config' passing with READY FOR IONOS RESET.
+services:
+  postgres:
+    image: ${HI5_IMAGE_POSTGRES:?Approved immutable PostgreSQL digest required}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hi5central}
+      POSTGRES_USER: ${POSTGRES_USER:-hi5central}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hi5central} -d ${POSTGRES_DB:-hi5central}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: ${HI5_IMAGE_REDIS:?Approved immutable Redis digest required}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD}"]
+    volumes:
+      - redis_data:/data
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  config-init:
+    image: ${HI5_IMAGE_CONFIG_INIT:?Approved immutable init image digest required}
+    restart: "no"
+    network_mode: none
+    environment:
+      TURN_SHARED_SECRET: ${TURN_SHARED_SECRET:?TURN_SHARED_SECRET is required}
+      TURN_REALM: ${TURN_REALM:-hi5central}
+      TURN_EXTERNAL_IP: ${TURN_EXTERNAL_IP:-}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      MANAGED_TENANT_SLUGS: ${MANAGED_TENANT_SLUGS:-}
+      ITSM_ADDRESS: ${ITSM_ADDRESS}
+      MARKETING_ADDRESS: ${MARKETING_ADDRESS:?Marketing hostname required}
+      RMM_ADDRESS: ${RMM_ADDRESS}
+      ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
+      API_ADDRESS: ${API_ADDRESS}
+      DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+      RELEASE_TEST_ADDRESSES: ${RELEASE_TEST_ADDRESSES:-}
+      RELEASE_TEST_GATEWAY_UPSTREAM: ${RELEASE_TEST_GATEWAY_UPSTREAM:-}
+      RELEASE_UAT_ADDRESSES: ${RELEASE_UAT_ADDRESSES:-}
+      RELEASE_UAT_GATEWAY_UPSTREAM: ${RELEASE_UAT_GATEWAY_UPSTREAM:-}
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        umask 077
+        printf '%s\n' "$$TURN_SHARED_SECRET" > /run-secrets/turn_shared_secret
+
+        {
+          echo "listening-port=3478"
+          echo "fingerprint"
+          echo "use-auth-secret"
+          echo "static-auth-secret=$$TURN_SHARED_SECRET"
+          echo "realm=$$TURN_REALM"
+          echo "min-port=49160"
+          echo "max-port=49200"
+          echo "stale-nonce=600"
+          echo "no-loopback-peers"
+          echo "no-multicast-peers"
+          if [ -n "$$TURN_EXTERNAL_IP" ]; then
+            echo "external-ip=$$TURN_EXTERNAL_IP"
+          fi
+        } > /turn-config/turnserver.conf
+
+        : > /gateway-config/Caddyfile
+        if [ -n "$$ACME_EMAIL" ]; then
+          printf '{\n  email %s\n}\n\n' "$$ACME_EMAIL" >> /gateway-config/Caddyfile
+        fi
+        cat >> /gateway-config/Caddyfile <<EOF
+        $$API_ADDRESS {
+          reverse_proxy control-server:3001
+        }
+
+        $MARKETING_ADDRESS {
+          reverse_proxy marketing-web:80
+        }
+
+        $RMM_ADDRESS {
+          reverse_proxy rmm-web:80
+        }
+        EOF
+
+        # No customer DNS routes are seeded during clean installation.\n        # All tenant routes require later authenticated provisioning and\n        # independently attested runtime assignment; never guess a slug.\n\n        if [ -n "$$ADMIN_ADDRESS" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$ADMIN_ADDRESS {
+          reverse_proxy admin-web:80
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_TEST_ADDRESSES" ] && [ -n "$$RELEASE_TEST_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_TEST_ADDRESSES {
+          reverse_proxy $$RELEASE_TEST_GATEWAY_UPSTREAM
+        }
+        EOF
+        fi
+
+        if [ -n "$$RELEASE_UAT_ADDRESSES" ] && [ -n "$$RELEASE_UAT_GATEWAY_UPSTREAM" ]; then
+          cat >> /gateway-config/Caddyfile <<EOF
+        $$RELEASE_UAT_ADDRESSES {
+          reverse_proxy $$RELEASE_UAT_GATEWAY_UPSTREAM
+        }
+        EOF
+        fi
+
+        cat >> /gateway-config/Caddyfile <<EOF
+        $$DOWNLOADS_ADDRESS {
+          root * /srv/downloads
+          file_server
+          header Cache-Control "public, max-age=300"
+        }
+        EOF
+
+        chown 1000:1000 /run-secrets/turn_shared_secret
+        chmod 640 /run-secrets/turn_shared_secret
+        chown 65534:65534 /turn-config/turnserver.conf
+        chmod 640 /turn-config/turnserver.conf
+        chown 0:0 /gateway-config/Caddyfile
+        chmod 600 /gateway-config/Caddyfile
+    volumes:
+      - runtime_secrets:/run-secrets
+      - turn_runtime_config:/turn-config
+      - gateway_runtime_config:/gateway-config
+
+  agent-deployment-assets:
+    image: ${HI5_IMAGE_AGENT_DEPLOYMENT_ASSETS:?Approved immutable agent assets digest required}
+    restart: "no"
+    network_mode: none
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        rm -rf /target/templates /target/generic
+        mkdir -p /target/templates /target/generic
+        cp -a /assets/templates/. /target/templates/
+        cp -a /assets/generic/. /target/generic/
+        find /target/templates /target/generic -type d -exec chmod 0755 {} \;
+        find /target/templates /target/generic -type f -exec chmod 0644 {} \;
+        echo "Hi5Central Agent deployment assets seeded."
+    volumes:
+      - tenant_installer_artifacts:/target
+
+  migrate:
+    image: ${HI5_IMAGE_API:?Approved immutable API digest required}
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
+    command: ["npm", "run", "migrate:dist"]
+    networks: [hi5internal]
+
+  control-server:
+    image: ${HI5_IMAGE_API:?Approved immutable API digest required}
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      agent-deployment-assets:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      BACKGROUND_WORKERS_ENABLED: ${BACKGROUND_WORKERS_ENABLED:-true}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hi5central}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hi5central}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
+      MARKETING_URL: ${MARKETING_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      VIEWER_DOWNLOAD_URL_WINDOWS: ${VIEWER_DOWNLOAD_URL_WINDOWS:-}
+      VIEWER_DOWNLOAD_URL_MACOS: ${VIEWER_DOWNLOAD_URL_MACOS:-}
+      VIEWER_DOWNLOAD_URL_LINUX: ${VIEWER_DOWNLOAD_URL_LINUX:-}
+      TURN_URL: ${TURN_URL}
+      COOKIE_DOMAIN: ${COOKIE_DOMAIN:-}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?MFA_ENCRYPTION_KEY is required}
+      RMM_RECOVERY_KEY_ENCRYPTION_KEY: ${RMM_RECOVERY_KEY_ENCRYPTION_KEY:?RMM_RECOVERY_KEY_ENCRYPTION_KEY is required}
+      CONNECT_CODE_HMAC_KEY: ${CONNECT_CODE_HMAC_KEY:?CONNECT_CODE_HMAC_KEY is required}
+      TENANT_INSTALLER_HMAC_KEY: ${TENANT_INSTALLER_HMAC_KEY:-}
+      TENANT_INSTALLER_API_BASE: ${TENANT_INSTALLER_API_BASE:-}
+      TENANT_INSTALLER_GENERIC_ASSET_DIR: /srv/tenant-installers/generic
+      INITIAL_SETUP_TOKEN: ${INITIAL_SETUP_TOKEN:?INITIAL_SETUP_TOKEN is required}
+      TENANT_INSTALLER_ARTIFACT_DIR: /srv/tenant-installers
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-}
+      TURN_HOST: ${TURN_HOST:-turn}
+      TURN_SHARED_SECRET_FILE: /run/secrets/turn_shared_secret
+      APP_PORTAL_PACKAGE_DIR: /srv/app-portal-packages
+      LICENSING_SERVER_URL: ${LICENSING_SERVER_URL:-https://licensing.hi5central.com}
+      LICENSING_PUBLIC_KEY_PEM: ${LICENSING_PUBLIC_KEY_PEM:-}
+      LICENSING_PRIVATE_KEY_PEM: ${LICENSING_PRIVATE_KEY_PEM:-}
+      RELEASE_OPERATOR_TOKEN: ${RELEASE_OPERATOR_TOKEN:-}
+      RELEASE_FEED_URL: ${RELEASE_FEED_URL:-https://api.hi5central.com/api/releases/v1/feed}
+      RELEASE_SIGNING_PUBLIC_KEY_PEM: ${RELEASE_SIGNING_PUBLIC_KEY_PEM:-}
+      RELEASE_SIGNING_PRIVATE_KEY_PEM: ${RELEASE_SIGNING_PRIVATE_KEY_PEM:-}
+      RELEASE_FEED_SYNC_INTERVAL_MS: ${RELEASE_FEED_SYNC_INTERVAL_MS:-21600000}
+      RELEASE_FEED_INITIAL_SYNC_DELAY_MS: ${RELEASE_FEED_INITIAL_SYNC_DELAY_MS:-45000}
+      LICENSING_REFRESH_INTERVAL_MS: ${LICENSING_REFRESH_INTERVAL_MS:-43200000}
+      LICENSING_INITIAL_REFRESH_DELAY_MS: ${LICENSING_INITIAL_REFRESH_DELAY_MS:-30000}
+    volumes:
+      - app_portal_packages:/srv/app-portal-packages
+      - tenant_installer_artifacts:/srv/tenant-installers
+      - runtime_secrets:/run/secrets:ro
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      start_period: 20s
+      retries: 12
+
+  itsm-web:
+    profiles: ["itsm"]
+    image: ${HI5_IMAGE_ITSM:?Approved immutable ITSM digest required}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
+      MARKETING_URL: ${MARKETING_URL}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  rmm-web:
+    profiles: ["rmm"]
+    image: ${HI5_IMAGE_RMM:?Approved immutable RMM digest required}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  admin-web:
+    profiles: ["admin"]
+    image: ${HI5_IMAGE_ADMIN:?Approved immutable Admin digest required}
+    restart: unless-stopped
+    depends_on:
+      control-server:
+        condition: service_healthy
+    environment:
+      DEPLOYMENT_MODE: ${DEPLOYMENT_MODE:-self_hosted}
+      SELF_HOST_EDITION: ${SELF_HOST_EDITION:-standard}
+      TENANCY_MODE: ${TENANCY_MODE:-single}
+      RUNTIME_ENVIRONMENT: ${RUNTIME_ENVIRONMENT:-live}
+      FEATURE_MODE: ${FEATURE_MODE:-controlled}
+      ROOT_DOMAIN: ${ROOT_DOMAIN}
+      PRIMARY_TENANT_SLUG: ${PRIMARY_TENANT_SLUG:-local}
+      APP_URL: ${APP_URL}
+      API_URL: ${API_URL}
+      PORTAL_URL: ${PORTAL_URL}
+      RMM_URL: ${RMM_URL}
+      ADMIN_URL: ${ADMIN_URL:-}
+      DOWNLOADS_URL: ${DOWNLOADS_URL}
+      TURN_URL: ${TURN_URL}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  turn:
+    profiles: ["${TURN_SERVICE_PROFILE:-rmm}"]
+    image: ${HI5_IMAGE_TURN:?Approved immutable TURN digest required}
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    ports:
+      - "${TURN_LISTEN_PORT:-3478}:3478/tcp"
+      - "${TURN_LISTEN_PORT:-3478}:3478/udp"
+      - "${TURN_RELAY_MIN_PORT:-49160}-${TURN_RELAY_MAX_PORT:-49200}:49160-49200/udp"
+    volumes:
+      - turn_runtime_config:/etc/coturn:ro
+    networks: [hi5internal]
+
+  # Dedicated public marketing/signup artifact. This must be production-
+  # hardened and pinned before the final clean VPS acceptance gate.
+  marketing-web:
+    image: ${HI5_IMAGE_MARKETING:?Approved immutable marketing image digest required}
+    restart: unless-stopped
+    environment:
+      DEPLOYMENT_MODE: managed
+      TENANCY_MODE: multi
+      ROOT_DOMAIN: ${ROOT_DOMAIN:?Root domain required}
+      MARKETING_URL: ${MARKETING_URL:?Marketing URL required}
+      API_URL: ${API_URL:?API URL required}
+    networks: [hi5internal]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -qx ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  gateway:
+    image: ${HI5_IMAGE_CADDY:?Approved immutable Caddy digest required}
+    restart: unless-stopped
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
+      control-server:
+        condition: service_healthy
+      marketing-web:
+        condition: service_healthy
+    environment:
+      ITSM_ADDRESS: ${ITSM_ADDRESS}
+      RMM_ADDRESS: ${RMM_ADDRESS}
+      ADMIN_ADDRESS: ${ADMIN_ADDRESS}
+      HELP_ADDRESS: ${HELP_ADDRESS:-}
+      API_ADDRESS: ${API_ADDRESS}
+      DOWNLOADS_ADDRESS: ${DOWNLOADS_ADDRESS}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    ports:
+      - "${GATEWAY_HTTP_PORT:-80}:80"
+      - "${GATEWAY_HTTPS_PORT:-443}:443"
+      - "${GATEWAY_HTTPS_PORT:-443}:443/udp"
+    volumes:
+      - gateway_runtime_config:/etc/caddy:ro
+      - downloads:/srv/downloads:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [hi5internal]
+
+networks:
+  hi5internal:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+  downloads:
+  app_portal_packages:
+  tenant_installer_artifacts:
+  runtime_secrets:
+  turn_runtime_config:
+  gateway_runtime_config:
