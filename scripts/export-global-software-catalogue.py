@@ -69,6 +69,8 @@ def main():
  backup=Path("/var/backups/hi5central/release-activation/pre-generic-final-20261017T110313Z.dump")
  if not backup.is_file() or backup.stat().st_size<1000000:
   raise RuntimeError("Verified original Production recovery dump missing.")
+ if sha(backup)!="7a76e3bc176c2b4858bb6f151e7d4bce37246138bb1b45f81a38ed5f3c281a94":
+  raise RuntimeError("Original Production recovery dump SHA256 differs from verified baseline.")
  with tempfile.TemporaryDirectory(prefix=".global-catalogue-",dir=BASE) as td:
   tmp=Path(td)
   files={k:(tmp/(k+".jsonl")).open("w",encoding="utf-8",newline="\n") for k in TABLES}
@@ -106,7 +108,7 @@ def main():
   finally:
    for f in files.values():
     f.close()
-  err=proc.stderr.read(limit:=20000)
+  proc.stderr.read(20000)  # Avoid logging details from the source metadata.
   rc=proc.wait()
   if rc!=0:
    raise RuntimeError("Read-only PostgreSQL catalogue export failed (psql exit "+str(rc)+").")
@@ -117,7 +119,8 @@ def main():
    "created_utc":datetime.now(timezone.utc).isoformat(),
    "source_database":"hi5central",
    "snapshot":"single-statement-repeatable-query",
-   "contains_customer_tickets_devices_or_agent_secrets":False,
+   "customer_data_excluded_by_table_and_tenant_filter":True,
+   "metadata_secret_scrubbing_review_required":True,
    "source_metadata_may_contain_credentials":True,
    "requires_independent_import_validation":True,
    "tenant_scoped_catalogue_exported":False,
@@ -127,9 +130,11 @@ def main():
   }
   manpath=tmp/"manifest.json"
   manpath.write_text(json.dumps(manifest,indent=2)+"\n",encoding="utf-8")
-  with tarfile.open(final,"w:gz") as arc:
+  pending=tmp/"bundle.pending.tar.gz"
+  with tarfile.open(pending,"w:gz") as arc:
    for path in [manpath,*[tmp/(k+".jsonl") for k in TABLES]]:
     arc.add(path,arcname=path.name,recursive=False)
+  os.replace(pending,final)
  os.chmod(final,0o600)
  print("PASS: Global software catalogue seed safely exported.")
  print("Bundle: "+str(final))
