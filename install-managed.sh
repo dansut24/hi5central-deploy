@@ -22,6 +22,8 @@ Usage:
   sudo ./install-managed.sh --verify-secrets
   ./install-managed.sh --check-manifest --manifest PATH
   sudo ./install-managed.sh --fresh-host-preflight
+  sudo ./install-managed.sh --render-core --manifest /private/reviewed-release.json
+  sudo ./install-managed.sh --verify-core-compose
   sudo ./install-managed.sh --install --admin-email ADMIN@DOMAIN --catalogue PATH
 
 STATUS: Only non-deploying preflight and secret preparation are implemented so far.
@@ -44,7 +46,7 @@ EOF
 }
 while (($#));do
  case "$1" in
- --dry-run|--prepare|--verify-secrets|--check-manifest|--fresh-host-preflight|--install)
+ --dry-run|--prepare|--verify-secrets|--check-manifest|--fresh-host-preflight|--render-core|--verify-core-compose|--install)
    if [[ -n "$ACTION" ]];then echo "Choose exactly one action." >&2;exit 2;fi
    ACTION="$1";shift;;
  --admin-email) ADMIN_EMAIL="$2";shift 2;;
@@ -86,6 +88,23 @@ case "$ACTION" in
   ;;
  --fresh-host-preflight)
   python3 "$ROOT_DIR/scripts/check-managed-fresh-host.py"
+  ;;
+ --render-core)
+  [[ $EUID -eq 0 ]] || { echo "Run as root." >&2;exit 1;}
+  [[ -n "$MANIFEST" ]] || { echo "--manifest FILE required." >&2;exit 2;}
+  python3 "$ROOT_DIR/scripts/check-managed-fresh-host.py"
+  python3 "$ROOT_DIR/scripts/prepare-managed-secrets.py" --root "$SECRET_DIR" --verify
+  python3 "$ROOT_DIR/scripts/render-managed-runtime.py"     --root "$SECRET_DIR" --manifest "$MANIFEST" --apply
+  echo "CORE CONFIG PREPARED — no containers started, installer NOT ready."
+  ;;
+ --verify-core-compose)
+  [[ -r "$SECRET_DIR/managed-runtime.env" ]] || {
+   echo "Private managed-runtime.env missing; run --render-core on fresh VPS." >&2; exit 3;
+  }
+  command -v docker >/dev/null || { echo "Docker Compose required." >&2;exit 3;}
+  docker compose -f "$ROOT_DIR/compose.managed-core.yml"     -f "$ROOT_DIR/compose.pgadmin-private.yml"     --env-file "$SECRET_DIR/managed-runtime.env"     --profile itsm --profile rmm --profile admin --profile database-browser     config --quiet
+  echo "PASS: managed core Compose configuration is structurally valid."
+  echo "No services started; does not prove readiness for IONOS reset."
   ;;
  --install)
   echo "BLOCKED: full Hi5Central managed installer is NOT READY." >&2
