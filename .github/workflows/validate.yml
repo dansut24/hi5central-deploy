@@ -18,7 +18,7 @@ jobs:
         run: sh -n install.sh scripts/*.sh
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
