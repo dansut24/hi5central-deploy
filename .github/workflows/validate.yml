@@ -40,7 +40,7 @@ jobs:
         run: |
           umask 077
           printf 'ci-not-used-for-login\n' > /tmp/pgadmin-ci-password
-          docker compose -f compose.yml -f compose.pgadmin-private.yml --profile database-browser config --format json > /tmp/pgadmin-compose.json
+          docker compose -f compose.yml -f compose.pgadmin-private.yml --env-file environments/prod.env.example --profile database-browser config --format json > /tmp/pgadmin-compose.json
           python3 - <<'PY'
           import json
           with open('/tmp/pgadmin-compose.json') as f: config=json.load(f)
