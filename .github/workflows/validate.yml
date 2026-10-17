@@ -31,6 +31,30 @@ jobs:
           print('PASS: global software catalogue exporter is allowlisted and atomic')
           PY
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
+      - name: Verify private pgAdmin full-edit browser overlay
+        env:
+          HI5_PGADMIN_IMAGE: dpage/pgadmin4:ci-config-only
+          HI5_PGADMIN_EMAIL: administrator@example.invalid
+          HI5_PGADMIN_PASSWORD_FILE: /tmp/pgadmin-ci-password
+          HI5_PGADMIN_LOCAL_PORT: '5050'
+        run: |
+          umask 077
+          printf 'ci-not-used-for-login\n' > /tmp/pgadmin-ci-password
+          docker compose -f compose.yml -f compose.pgadmin-private.yml --profile database-browser config --format json > /tmp/pgadmin-compose.json
+          python3 - <<'PY'
+          import json
+          with open('/tmp/pgadmin-compose.json') as f: config=json.load(f)
+          service=config['services']['pgadmin']
+          ports=service['ports']
+          assert len(ports)==1
+          assert ports[0]['host_ip']=='127.0.0.1',ports
+          assert ports[0]['published']=='5050' or ports[0]['published']==5050
+          assert ports[0]['target']==80
+          assert 'hi5internal' in service['networks']
+          assert 'pgadmin_password' in config['secrets']
+          print('PASS: pgAdmin is private-loopback only and separately authenticated')
+          PY
+          rm /tmp/pgadmin-compose.json /tmp/pgadmin-ci-password
       - name: Validate Standard self-host bootstrap
         env:
           HI5_ROOT_DOMAIN: ci.localhost
