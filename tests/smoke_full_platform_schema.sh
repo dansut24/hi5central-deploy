@@ -59,7 +59,7 @@ ROLLBACK;
 SQL
 python3 tests/make_full_schema_seed.py "$WORK/seed.tar.gz"
 python3 scripts/verify-global-software-catalogue.py "$WORK/seed.tar.gz"
-sudo python3 scripts/import-global-software-catalogue.py --archive "$WORK/seed.tar.gz" --apply
+sudo env GITHUB_ACTIONS=true python3 scripts/import-global-software-catalogue.py --archive "$WORK/seed.tar.gz" --apply
 docker exec -i "$NAME" psql -X -v ON_ERROR_STOP=1 -U hi5central -d hi5central <<'SQL'
 BEGIN READ ONLY;
 DO $h5$
