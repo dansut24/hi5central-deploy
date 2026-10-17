@@ -50,6 +50,7 @@ def render(env,manifest):
   out["HI5_IMAGE_"+key.upper()]=image
  out["HI5_PGADMIN_IMAGE"]=manifest["images"]["pgadmin"]
  out["MARKETING_ADDRESS"]=domain
+ out["HI5_NATIVE_DOWNLOAD_ROOT"]="/var/lib/hi5central/native-downloads"
  out["COMPOSE_PROFILES"]="itsm,rmm,admin,database-browser"
  out["TURN_SERVICE_PROFILE"]="rmm"
  out["HI5_PLATFORM_GIT_SHA"]=manifest["platform_git_sha"]
