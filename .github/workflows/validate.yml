@@ -30,7 +30,7 @@ jobs:
           rm /tmp/h5-install-safety-output
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py scripts/render-managed-runtime.py scripts/bootstrap-managed-platform-owner.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py scripts/render-managed-runtime.py scripts/stage-managed-native-artifacts.py scripts/bootstrap-managed-platform-owner.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
@@ -45,6 +45,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
           python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
           python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
+          python3 -m unittest discover -s tests -p test_managed_native_staging.py -v
           python3 -m unittest discover -s tests -p test_managed_fresh_host.py -v
           python3 -m unittest discover -s tests -p test_render_managed_runtime.py -v
           python3 -m unittest discover -s tests -p test_managed_owner_password.py -v
@@ -76,6 +77,7 @@ jobs:
            'TURN_HOST':'turn.hi5central.com','TURN_REALM':'hi5central.com',
            'HI5_PGADMIN_EMAIL':'administrator@example.invalid',
            'HI5_PGADMIN_LOCAL_PORT':'5050',
+           'HI5_NATIVE_DOWNLOAD_ROOT':'/var/lib/hi5central/native-downloads',
            'HI5_PGADMIN_PASSWORD_FILE':'/tmp/managed-core-ci-password',
            'PRIMARY_TENANT_SLUG':'','MANAGED_TENANT_SLUGS':'',
            'RELEASE_ROLLOUT_PAUSED':'true','BACKGROUND_WORKERS_ENABLED':'false',
@@ -105,6 +107,7 @@ jobs:
           assert not services['postgres'].get('ports'),'No public Postgres'
           assert services['pgadmin']['ports'][0]['host_ip']=='127.0.0.1'
           assert services['pgadmin']['ports'][0]['target']==80
+          assert any('/var/lib/hi5central/native-downloads' in str(m) and '/srv/downloads' in str(m) for m in services['gateway']['volumes']), 'Native downloads must be bound read-only'
           assert services['control-server']['environment']['TENANCY_MODE']=='multi'
           assert services['control-server']['environment']['PRIMARY_TENANT_SLUG']==''
           assert services['control-server']['environment']['BACKGROUND_WORKERS_ENABLED']=='false'
