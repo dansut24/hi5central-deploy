@@ -13,15 +13,17 @@ DOMAIN="hi5central.com"
 ADMIN_EMAIL=""
 ACTION=""
 CATALOGUE=""
+MANIFEST=""
 usage(){
  cat <<'EOF'
 Usage:
   sudo ./install-managed.sh --dry-run --admin-email ADMIN@DOMAIN
   sudo ./install-managed.sh --prepare --admin-email ADMIN@DOMAIN
   sudo ./install-managed.sh --verify-secrets
+  ./install-managed.sh --check-manifest --manifest PATH
   sudo ./install-managed.sh --install --admin-email ADMIN@DOMAIN --catalogue PATH
 
-STATUS: Only non-deploying secret preparation is implemented so far.
+STATUS: Only non-deploying preflight and secret preparation are implemented so far.
        --install intentionally fails closed until full managed restore passes CI.
        Owner resets IONOS VPS manually; this script never wipes the server.
 
@@ -41,12 +43,13 @@ EOF
 }
 while (($#));do
  case "$1" in
- --dry-run|--prepare|--verify-secrets|--install)
+ --dry-run|--prepare|--verify-secrets|--check-manifest|--install)
    if [[ -n "$ACTION" ]];then echo "Choose exactly one action." >&2;exit 2;fi
    ACTION="$1";shift;;
  --admin-email) ADMIN_EMAIL="$2";shift 2;;
  --root-domain) DOMAIN="$2";shift 2;;
  --catalogue) CATALOGUE="$2";shift 2;;
+ --manifest) MANIFEST="$2";shift 2;;
  --secret-dir) SECRET_DIR="$2";shift 2;;
  --help|-h) usage;exit 0;;
  *) echo "Unknown option: $1" >&2;usage >&2;exit 2;;
@@ -56,6 +59,9 @@ done
 command -v python3 >/dev/null || { echo "Python3 required." >&2;exit 1;}
 case "$ACTION" in
  --dry-run)
+  if [[ -n "$MANIFEST" ]];then
+    python3 "$ROOT_DIR/scripts/validate-managed-image-manifest.py" "$MANIFEST"
+  fi
   python3 "$ROOT_DIR/scripts/prepare-managed-secrets.py" \
     --root "$SECRET_DIR" --root-domain "$DOMAIN" \
     --admin-email "$ADMIN_EMAIL" --dry-run
@@ -72,6 +78,10 @@ case "$ACTION" in
   ;;
  --verify-secrets)
   python3 "$ROOT_DIR/scripts/prepare-managed-secrets.py" --root "$SECRET_DIR" --verify
+  ;;
+ --check-manifest)
+  [[ -n "$MANIFEST" ]] || { echo "--manifest FILE is required." >&2; exit 2; }
+  python3 "$ROOT_DIR/scripts/validate-managed-image-manifest.py" "$MANIFEST"
   ;;
  --install)
   echo "BLOCKED: full Hi5Central managed installer is NOT READY." >&2
