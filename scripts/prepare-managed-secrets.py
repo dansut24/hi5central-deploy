@@ -33,6 +33,7 @@ LABELS={
  "HI5_WEBHOOK_HMAC_KEY":32,
 }
 FILES=("managed.env","pgadmin-password","pgadmin-editor-password",
+       "platform-owner-password",
        "internal-release-signing.key","internal-release-signing.pub","setup-state.json")
 DOMAIN=re.compile(r"^(?=.{4,253}$)[a-z0-9](?:[a-z0-9.-]*[a-z0-9])$")
 EMAIL=re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -140,6 +141,7 @@ def main():
    subprocess.run(["openssl","pkey","-in",str(signing_key),"-pubout"],
                   check=True,stdout=output,stderr=subprocess.DEVNULL)
   write_file(root/"pgadmin-password",values["HI5_PGADMIN_PASSWORD"]+"\n")
+  write_file(root/"platform-owner-password",secrets.token_urlsafe(48)+"\n")
   write_file(root/"pgadmin-editor-password",values["HI5_PGADMIN_EDITOR_PASSWORD"]+"\n")
   env={
    "COMPOSE_PROJECT_NAME":"hi5central-managed",
