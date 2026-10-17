@@ -22,11 +22,20 @@ Required service inventory:
   per-tenant environments and automatic version updates.
 - **coturn/TURN** with shared secrets, relay network and externally reachable
   ICE path; remote viewer/agent installer distribution and downloads.
-- **Software Qualification Runner**, including image, worker executable,
-  per-worker permissions, job-queue integration, scratch volume, workload
-  isolation, heartbeat, health check and rollback. Current public compose.yml
-  does NOT explicitly define this runner: installer MUST FAIL until its exact
-  approved source/repository, image and required persistence are identified.
+- **Software Qualification Runner is a registered Windows RMM agent,
+  not a VPS Docker container.** Its scheduling / queue-processing code lives in
+  `services/api/src/rmmSoftwareQualification.js` and
+  `rmmSoftwareVendorIntel.js`; `runSoftwareQualificationQueue` dispatches
+  through the RMM agent jobs API to a device registered in
+  `rmm_software_vendor_qualification_runners`. The Control API's qualification
+  queue/progression timers and durable queue, software catalogue, vendor intel
+  and runner registration schema MUST be included with the approved API image.
+  The qualification Windows device, PatchHost capabilities and its own
+  isolated installer scratch directory cannot be created by a VPS-only
+  script: enroll/rebind and verify its agent heartbeat, job-scoped artifact
+  cleanup and download/install/uninstall capability after fresh install.
+  A full `--verify-qualification` check MUST report BLOCKED if no eligible
+  connected Windows runner is present, rather than claim success.
 - Generic certified release planner, Test/UAT/Live workers, emergency pause,
   fenced job leases, isolated host deployment authority, release notes,
   audit history and safe rollback.
@@ -118,7 +127,10 @@ independent security review.
    Managed Live moves in its own window; Custom UAT is auto-staged; Custom
    Live waits for exact customer acceptance and their approved window.
 6. Verify device enrollment/online status, TURN relays and RMM agent update
-   on the two RMM tenants independently of ITSM UAT/Test rollout.
+   on the two RMM tenants independently of ITSM UAT/Test rollout. In addition,
+   reconnect a dedicated Windows qualification agent, enable qualification
+   dispatch explicitly, prove a harmless test qualification job and its
+   cleanup, and ensure failed/slow jobs are reviewed before requeueing.
 7. Verify all 10 exact SHA routes, per-tenant audit logs, dry-run,
    repeat scheduler idempotence, pause/revoke, failed upgrade, rollback,
    backup restore, host restart/recovery, and no cross-tenant leakage.
@@ -142,6 +154,8 @@ privately reviewed, support `--dry-run`, generate missing secrets without
 displaying them, check DNS/TLS/Docker/resources/firewall/backup, pin images,
 provision roles and database migrations, install all required services,
 validate smoke tests and 10-tenant readiness, and create a rollback/runbook
-report. If the Software Qualification Runner definition, real host executor,
-security tests or TURN verification is missing, installation MUST FAIL;
+report. If the software qualification scheduler/schema, a reachable
+configured Windows qualification runner for full acceptance, trusted host
+executor, security tests or TURN verification is missing, full
+`--verify` MUST report BLOCKED;
 do not claim success from 'containers running' alone.
