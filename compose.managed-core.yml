@@ -401,7 +401,7 @@ services:
       - "${GATEWAY_HTTPS_PORT:-443}:443/udp"
     volumes:
       - gateway_runtime_config:/etc/caddy:ro
-      - downloads:/srv/downloads:ro
+      - ${HI5_NATIVE_DOWNLOAD_ROOT:?Private native download staging root required}:/srv/downloads:ro
       - caddy_data:/data
       - caddy_config:/config
     networks: [hi5internal]
@@ -415,7 +415,6 @@ volumes:
   redis_data:
   caddy_data:
   caddy_config:
-  downloads:
   app_portal_packages:
   tenant_installer_artifacts:
   runtime_secrets:
