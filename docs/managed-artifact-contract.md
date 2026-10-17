@@ -121,13 +121,13 @@ will import (that private export has not yet been run/verified) or that a
 complete Platform API, web Admin, Caddy or marketing container starts.
 Actual IONOS installation remains blocked until full-stack acceptance.
 
-**Routing discrepancy identified:** Current
-`Hi5Central-Platform/services/api/src/deploymentConfig.js` emits
-`customer-portal.hi5central.com` in `tenantUrls().portalUrl`, whereas the
-approved URL contract requires `customer.hi5central.com/portal`.
-This needs a reviewed Platform code fix, route test and Caddy alignment
-before Production marketing/signup and tenant provisioning are ready.
-Do not silently change customer URLs in a database migration.
+**Tenant portal URL confirmed by owner:** Preserve the existing
+`customer-portal.hi5central.com` requester portal route from
+`Hi5Central-Platform/services/api/src/deploymentConfig.js`.
+Do **not** migrate it to `customer.hi5central.com/portal`.
+No portal hostname is created for the zero-tenant blank installation;
+future tenant provisioning must create and test its own `-portal` route,
+with collision protection and correct TLS/Caddy ownership.
 
 ## Known gaps in the existing source
 
@@ -136,7 +136,7 @@ Do not silently change customer URLs in a database migration.
 | `Hi5Central-Cloud/deploy/compose.cloud.yml` | Defines Postgres, Redis, API, ITSM, RMM, Admin, TURN and Caddy but uses floating tags | Import/consolidate into one managed fresh-install definition with checked immutable digests |
 | `Hi5Central-Cloud/scripts/setup-managed-region.sh` | Defaults `PRIMARY_TENANT_SLUG=test` and `MANAGED_TENANT_SLUGS=test` | Start with **zero tenants**; no temporary production customer |
 | `Hi5Central-Cloud/scripts/bootstrap-managed-admin.sh` | Requires existing tenant and membership | Provide a **tenant-independent global Admin** bootstrap that retains zero tenants |
-| Cloud Caddy `config-init` | Generates `slug-portal` hostname; user wants `slug.hi5central.com/portal` | Verify exact tenant hostname rules; Portal at /portal, optional RMM domain, Test, Custom-only UAT and tenant Admin; prevent wildcard route collisions |
+| Cloud Caddy `config-init` | Existing `slug-portal` hostname is **retained as requested** | Verify tenant provisioning activates `slug-portal.hi5central.com` for the Portal, optional RMM domain, Test, Custom-only UAT and tenant Admin, and prevents wildcard route collisions |
 | Current VPS marketing container `deployment-web` | No confirmed canonical pinned marketing/signup image in existing cloud Compose | Move the existing signup/marketing source into a reproducible image and verify signup |
 | Generic PR #79 Test/UAT/Live worker Dockerfile | Old deployed executors use DB superuser and root+writable Docker socket | Replace with independent protected host authority and non-superuser, stage-limited Postgres identities; audit rollback, canary and tenant gates |
 | Platform migrations + catalogue seed importer | CI importer passed against a **minimal disposable test schema**, not the full Platform migration history | Rehearse complete migration source and real catalogue export against disposable PostgreSQL before IONOS reset |
