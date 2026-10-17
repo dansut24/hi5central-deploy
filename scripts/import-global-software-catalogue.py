@@ -162,6 +162,10 @@ def main():
       'exec psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"']
  res=subprocess.run(cmd,input=buffer.getvalue(),text=True,capture_output=True)
  if res.returncode!=0:
+  if os.environ.get("GITHUB_ACTIONS")=="true" and args.archive.name=="seed.tar.gz" and any(
+      '"source_key":"synthetic_release_ci"' in doc for _,doc in rows):
+   # Only artificial CI fixtures are permitted here; no real vendor secrets.
+   print("CI SYNTHETIC ONLY PostgreSQL diagnostic: "+res.stderr[-3000:],file=sys.stderr)
   fail("Catalogue import failed and PostgreSQL transaction was rolled back (exit "+
        str(res.returncode)+").")
  print("PASS: global catalogue/source seed transaction committed in the NEW managed database.")
