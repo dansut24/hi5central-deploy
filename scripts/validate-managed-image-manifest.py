@@ -52,6 +52,13 @@ def validate(manifest):
  for key,entry in native.items():
   require(isinstance(entry,dict),"Invalid artifact entry: "+key)
   require(entry.get("status")=="verified","Artifact must have passed publication verification: "+key)
+  filename=entry.get("filename")
+  require(isinstance(filename,str) and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,160}",filename)
+          and filename not in (".","..") and not filename.endswith("."),
+          "Safe fixed artifact filename is required for "+key)
+  size=entry.get("size_bytes")
+  require(type(size) is int and 0 < size <= 1024*1024*1024,
+          "Approved native artifact byte size (1..1GiB) required for "+key)
   url=entry.get("url")
   require(isinstance(url,str) and HTTPS.fullmatch(url),
           "An HTTPS download URL is required for "+key)
