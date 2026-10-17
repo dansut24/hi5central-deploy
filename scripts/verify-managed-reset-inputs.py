@@ -37,15 +37,16 @@ def validate_bundle(bundle,seed):
          "Protected recovery bundle missing or unsafe.")
  require(bundle.stat().st_size <= 1024*1024*1024,
          "Recovery bundle exceeds 1 GiB review limit.")
- expected={
-   "hi5central-global-software-20261017.pgdump",
-   "global-software-seed-20261017T145713Z.tar.gz",
-   "production-schema-20261017.pgdump",
-   "SHA256SUMS.txt"
- }
  with tarfile.open(bundle,"r:gz") as tar:
   members={v.name:v for v in tar.getmembers()}
-  require(set(members)==expected,"Recovery bundle must contain exact approved component list.")
+  names=set(members)
+  seed_names=[n for n in names if re.fullmatch(r"global-software-seed-[0-9]{8}T[0-9]{6}Z[.]tar[.]gz",n)]
+  pg_names=[n for n in names if re.fullmatch(r"hi5central-global-software-[0-9]{8}[.]pgdump",n)]
+  schema_names=[n for n in names if re.fullmatch(r"production-schema-[0-9]{8}[.]pgdump",n)]
+  require(len(seed_names)==len(pg_names)==len(schema_names)==1,
+          "Recovery bundle requires one source archive, PostgreSQL dump and schema.")
+  expected={"SHA256SUMS.txt",*seed_names,*pg_names,*schema_names}
+  require(names==expected,"Recovery bundle contains unapproved entries.")
   require(all(v.isfile() and 0 < v.size <= 1024*1024*1024
               for v in members.values()),"Unsafe recovery bundle member.")
   raw=tar.extractfile("SHA256SUMS.txt").read()
@@ -65,7 +66,7 @@ def validate_bundle(bundle,seed):
      h.update(chunk)
    require(h.hexdigest()==checks[name],"Recovery SHA256 mismatch: "+name)
   seed_sha=sha256(seed.read_bytes())
-  require(seed_sha==checks["global-software-seed-20261017T145713Z.tar.gz"],
+  require(seed_sha==checks[seed_names[0]],
           "Provided catalogue archive not identical to protected recovery bundle.")
  return checks
 
