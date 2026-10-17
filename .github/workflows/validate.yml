@@ -18,7 +18,7 @@ jobs:
         run: sh -n install.sh scripts/*.sh
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
@@ -31,6 +31,7 @@ jobs:
           print('PASS: global software catalogue exporter is allowlisted and atomic')
           PY
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
+          python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
       - name: Verify private pgAdmin full-edit browser overlay
         env:
           HI5_PGADMIN_IMAGE: dpage/pgadmin4:ci-config-only
