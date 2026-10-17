@@ -30,7 +30,7 @@ jobs:
           rm /tmp/h5-install-safety-output
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
@@ -45,6 +45,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_global_software_seed.py -v
           python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
           python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
+          python3 -m unittest discover -s tests -p test_managed_fresh_host.py -v
       - name: Validate fresh PostgreSQL catalogue restore and private editor permissions
         run: |
           bash -n tests/smoke_managed_seed_postgres.sh
