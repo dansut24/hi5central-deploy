@@ -47,6 +47,7 @@ jobs:
           python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
           python3 -m unittest discover -s tests -p test_managed_fresh_host.py -v
           python3 -m unittest discover -s tests -p test_render_managed_runtime.py -v
+          python3 -m unittest discover -s tests -p test_managed_owner_password.py -v
       - name: Validate digest-pinned zero-tenant cloud Compose core (NO host deploy)
         run: |
           python3 - <<'PY'
@@ -120,6 +121,8 @@ jobs:
         run: |
           bash -n tests/smoke_managed_seed_postgres.sh
           bash tests/smoke_managed_seed_postgres.sh
+          bash -n tests/smoke_managed_owner_postgres.sh
+          bash tests/smoke_managed_owner_postgres.sh
       - name: Verify private pgAdmin full-edit browser overlay
         env:
           HI5_PGADMIN_IMAGE: dpage/pgadmin4:ci-config-only
