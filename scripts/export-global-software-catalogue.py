@@ -7,6 +7,7 @@ Full Production recovery backup must be kept separately.
 Example:
   sudo python3 scripts/export-global-software-catalogue.py
 """
+import argparse
 import csv
 import hashlib
 import io
@@ -56,22 +57,29 @@ def sha(path):
  return h.hexdigest()
 
 def main():
+ parser=argparse.ArgumentParser(description=__doc__)
+ parser.add_argument('--output-dir',type=Path,default=BASE)
+ parser.add_argument('--catalogue-only-without-full-recovery',action='store_true',
+  help='Generate a catalogue-only backup when full database dump is not mounted. Does NOT certify VPS reset readiness.')
+ args=parser.parse_args()
+ target=args.output_dir
+ if not target.is_absolute() or target.is_symlink():
+  raise RuntimeError('Export destination must be a dedicated absolute nonsymlink path.')
  os.umask(0o077)
  if os.geteuid()!=0:
   raise RuntimeError("Run as root; catalogue source metadata must remain private.")
- if not BASE.is_dir():
-  BASE.mkdir(mode=0o700,parents=True)
- os.chmod(BASE,0o700)
+ if not target.is_dir():
+  target.mkdir(mode=0o700,parents=True)
+ os.chmod(target,0o700)
  stamp=datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
- final=BASE/("global-software-seed-"+stamp+".tar.gz")
+ final=target/("global-software-seed-"+stamp+".tar.gz")
  if final.exists():
   raise RuntimeError("Refusing to overwrite an existing seed bundle.")
  backup=Path("/var/backups/hi5central/release-activation/pre-generic-final-20261017T110313Z.dump")
- if not backup.is_file() or backup.stat().st_size<1000000:
-  raise RuntimeError("Verified original Production recovery dump missing.")
- if sha(backup)!="7a76e3bc176c2b4858bb6f151e7d4bce37246138bb1b45f81a38ed5f3c281a94":
-  raise RuntimeError("Original Production recovery dump SHA256 differs from verified baseline.")
- with tempfile.TemporaryDirectory(prefix=".global-catalogue-",dir=BASE) as td:
+ baseline_valid=backup.is_file() and backup.stat().st_size>=1000000 and sha(backup)=="7a76e3bc176c2b4858bb6f151e7d4bce37246138bb1b45f81a38ed5f3c281a94"
+ if not baseline_valid and not args.catalogue_only_without_full_recovery:
+  raise RuntimeError("Full recovery baseline unavailable/changed. For catalogue-only preservation explicitly use --catalogue-only-without-full-recovery; this does NOT certify VPS reset readiness.")
+ with tempfile.TemporaryDirectory(prefix=".global-catalogue-",dir=target) as td:
   tmp=Path(td)
   files={k:(tmp/(k+".jsonl")).open("w",encoding="utf-8",newline="\n") for k in TABLES}
   counts={k:0 for k in TABLES}
@@ -123,6 +131,7 @@ def main():
    "metadata_secret_scrubbing_review_required":True,
    "source_metadata_may_contain_credentials":True,
    "requires_independent_import_validation":True,
+   "full_recovery_baseline_verified_in_this_runtime":baseline_valid,
    "tenant_scoped_catalogue_exported":False,
    "tables":[{"alias":k,"table":v,"rows":counts[k],
               "file":k+".jsonl","sha256":sha(tmp/(k+".jsonl"))}
@@ -140,6 +149,7 @@ def main():
  print("Bundle: "+str(final))
  print("SHA256: "+sha(final))
  print("Global row counts (no data displayed): "+json.dumps(counts,sort_keys=True))
+ print("Full recovery baseline independently verified in this runtime:",baseline_valid)
  print("IMPORTANT: This file can include source URLs and metadata; keep it private.")
  print("Do NOT wipe the VPS until the bundle is copied off-host AND")
  print("verified against a fresh PostgreSQL import on an isolated install.")
