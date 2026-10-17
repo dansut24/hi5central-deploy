@@ -19,6 +19,12 @@ jobs:
       - name: Check managed single-command entrypoint syntax and fail closed
         run: |
           bash -n install-managed.sh
+          set +e
+          bash install-managed.sh --preflight-install > /tmp/preflight-no-args.log 2>&1
+          rc=$?
+          set -e
+          test "$rc" -eq 2
+          grep -q 'Require --manifest' /tmp/preflight-no-args.log
           python3 scripts/validate-managed-image-manifest.py --help >/dev/null
           set +e
           bash install-managed.sh --install --admin-email owner@example.invalid > /tmp/h5-install-safety-output 2>&1
@@ -30,7 +36,7 @@ jobs:
           rm /tmp/h5-install-safety-output
       - name: Validate managed clean-rebuild safety tools
         run: |
-          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py scripts/render-managed-runtime.py scripts/stage-managed-native-artifacts.py scripts/bootstrap-managed-platform-owner.py
+          python3 -m py_compile scripts/managed-isolated-rehearsal-cleanup.py scripts/export-global-software-catalogue.py scripts/verify-global-software-catalogue.py scripts/prepare-managed-secrets.py scripts/import-global-software-catalogue.py scripts/configure-managed-db-editor.py scripts/validate-managed-image-manifest.py scripts/check-managed-fresh-host.py scripts/render-managed-runtime.py scripts/stage-managed-native-artifacts.py scripts/bootstrap-managed-platform-owner.py scripts/verify-managed-reset-inputs.py
           bash -n scripts/managed-prewipe-inventory.sh scripts/managed-qualification-and-disposable-audit.sh
           python3 - <<'PY'
           from pathlib import Path
@@ -46,6 +52,9 @@ jobs:
           python3 -m unittest discover -s tests -p test_managed_secret_preparation.py -v
           python3 -m unittest discover -s tests -p test_managed_image_manifest.py -v
           python3 -m unittest discover -s tests -p test_managed_native_staging.py -v
+          python3 -m unittest discover -s tests -p test_managed_restore_preflight.py -v
+          python3 -m unittest discover -s tests -p test_managed_offsite_backup.py -v
+          bash -n scripts/upload-managed-recovery.sh
           python3 -m unittest discover -s tests -p test_managed_fresh_host.py -v
           python3 -m unittest discover -s tests -p test_render_managed_runtime.py -v
           python3 -m unittest discover -s tests -p test_managed_owner_password.py -v
