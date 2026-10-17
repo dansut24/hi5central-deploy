@@ -63,7 +63,7 @@ jobs:
            'API_ADDRESS':'api.hi5central.com','ADMIN_ADDRESS':'admin.hi5central.com',
            'DOWNLOADS_ADDRESS':'downloads.hi5central.com',
            'APP_URL':'https://hi5central.com','MARKETING_URL':'https://hi5central.com',
-           'API_URL':'https://api.hi5central.com','PORTAL_URL':'https://hi5central.com/portal',
+           'API_URL':'https://api.hi5central.com','PORTAL_URL':'',
            'RMM_URL':'https://rmm.hi5central.com','ADMIN_URL':'https://admin.hi5central.com',
            'DOWNLOADS_URL':'https://downloads.hi5central.com','COOKIE_DOMAIN':'.hi5central.com',
            'ACME_EMAIL':'administrator@example.invalid','POSTGRES_DB':'hi5central',
@@ -200,6 +200,12 @@ jobs:
           test "$(git -C platform rev-parse HEAD)" = "73e72519e486827e77d9b7cfac8e2655a505a238"
           test -f platform/services/api/src/migrate.js
           test -f platform/services/api/package-lock.json
+      - name: Verify current managed requester portal hostname contract
+        run: |
+          cd platform/services/api
+          DEPLOYMENT_MODE=managed TENANCY_MODE=multi ROOT_DOMAIN=hi5central.com \
+            node --input-type=module -e "import { tenantUrls } from './src/deploymentConfig.js'; const u=tenantUrls('customer',{rmm:true}); if (u.portalUrl!=='https://customer-portal.hi5central.com' || u.tenantUrl!=='https://customer.hi5central.com' || u.rmmUrl!=='https://customer-rmm.hi5central.com') { console.error(u);process.exit(1) } console.log('PASS: canonical -portal tenant route retained')"
+
       - name: Rehearse ALL source migrations, global seed and Admin on empty PostgreSQL
         run: |
           bash -n tests/smoke_full_platform_schema.sh
