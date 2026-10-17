@@ -83,7 +83,7 @@ jobs:
           for name,image in manifest['images'].items():
            env['HI5_IMAGE_'+name.upper()]=image
           env['HI5_PGADMIN_IMAGE']=manifest['images']['pgadmin']
-          Path('/tmp/managed-core-ci.env').write_text(''.join(k+'='+v+'\\n' for k,v in env.items()))
+          Path('/tmp/managed-core-ci.env').write_text(''.join(k+'='+v+'\n' for k,v in env.items()))
           Path('/tmp/managed-core-ci-password').write_text('ci-private-test-only')
           PY
           docker compose -f compose.managed-core.yml -f compose.pgadmin-private.yml \
