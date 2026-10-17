@@ -1,10 +1,18 @@
-# OPTIONAL local-only PostgreSQL inspection, not an Internet service.
+# REQUIRED in the managed fresh-VPS install; PRIVATE loopback-only pgAdmin.
+# Existing Standard/MSP self-host installs do not enable this overlay.
 # Requires a reviewed, immutable pgAdmin image reference and a private password
 # file. With compose.yml this shares hi5internal but publishes only loopback.
 # Access from your laptop through: ssh -L 5050:127.0.0.1:5050 root@VPS
 # Then browse http://127.0.0.1:5050 (pgAdmin login != database login).
-# Register "postgres" port 5432 with a separately provisioned READ-ONLY
-# PostgreSQL identity; never reuse POSTGRES_USER / database superuser.
+# Register the PostgreSQL service (port 5432, inside the private Compose
+# network) using a separately provisioned DATABASE-ADMIN identity with full
+# application-table view/edit access, not a cluster superuser or API identity.
+# Fresh bootstrap must verify SELECT/INSERT/UPDATE/DELETE in a disposable
+# table before declaring database administration READY. A separate migration
+# owner role may be needed for ALTER/DDL privileges.
+# Secure pgAdmin web login and PostgreSQL database login are distinct.
+# CRITICAL: Do not expose this UI or port 5432 to a public interface.
+# A managed install must pass --profile database-browser in its Compose invocation.
 #
 # docker compose -f compose.yml -f compose.pgadmin-private.yml \
 #   --profile database-browser up -d pgadmin
