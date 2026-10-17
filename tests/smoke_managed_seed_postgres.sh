@@ -96,6 +96,27 @@ DELETE FROM rmm_software_catalogue WHERE id='dbeditor-ci';
 ROLLBACK;
 SELECT rolname,rolsuper,rolbypassrls
 FROM pg_roles WHERE rolname='hi5_pgadmin_editor';
+SQL
+# Test a real, password-authenticated PostgreSQL connection as the dedicated
+# editor account. SET ROLE alone would not prove browser login can succeed.
+EDITOR_PASSWORD="$(cat "$WORK/secrets/pgadmin-editor-password")"
+docker exec -i -e "PGPASSWORD=$EDITOR_PASSWORD" "$NAME"  psql -h 127.0.0.1 -X -v ON_ERROR_STOP=1  -U hi5_pgadmin_editor -d hi5central <<'SQL'
+BEGIN;
+INSERT INTO rmm_software_catalogue(id,tenant_id,status)
+ VALUES('authenticated-editor-ci',NULL,'active');
+UPDATE rmm_software_catalogue
+ SET status='disabled' WHERE id='authenticated-editor-ci';
+DO $h5$
+BEGIN
+ IF (SELECT status FROM rmm_software_catalogue
+    WHERE id='authenticated-editor-ci')<>'disabled'
+ THEN RAISE EXCEPTION 'Authenticated Editor UPDATE failed'; END IF;
+END $h5$;
+DELETE FROM rmm_software_catalogue WHERE id='authenticated-editor-ci';
+COMMIT;
+SQL
+unset EDITOR_PASSWORD
+docker exec -i "$NAME" psql -X -v ON_ERROR_STOP=1 -U hi5central -d hi5central <<'SQL'
 INSERT INTO tenants VALUES('ci-tenant');
 SQL
 # The second import must refuse the no-longer-empty database without changing
