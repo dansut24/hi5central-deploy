@@ -92,16 +92,20 @@ services:
           reverse_proxy control-server:3001
         }
 
-        $MARKETING_ADDRESS {
+        $$MARKETING_ADDRESS {
           reverse_proxy marketing-web:80
         }
 
-        $RMM_ADDRESS {
+        $$RMM_ADDRESS {
           reverse_proxy rmm-web:80
         }
         EOF
 
-        # No customer DNS routes are seeded during clean installation.\n        # All tenant routes require later authenticated provisioning and\n        # independently attested runtime assignment; never guess a slug.\n\n        if [ -n "$$ADMIN_ADDRESS" ]; then
+        # No customer DNS routes are seeded during clean installation.
+        # All tenant routes require later authenticated provisioning and
+        # independently attested runtime assignment; never guess a slug.
+
+        if [ -n "$$ADMIN_ADDRESS" ]; then
           cat >> /gateway-config/Caddyfile <<EOF
         $$ADMIN_ADDRESS {
           reverse_proxy admin-web:80
