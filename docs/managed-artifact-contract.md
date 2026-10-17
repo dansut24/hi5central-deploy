@@ -14,7 +14,7 @@ the host. The strict schema `hi5central-managed-restore-v1` requires:
   `release_rollout_paused=true`, `catalogue_seed_policy=global_only`,
   `externals_optional=true`.
 - One 40-character immutable **Platform Git commit SHA**.
-- Exactly 14 **digest-pinned** container artifacts (no floating `:dev`,
+- Exactly 15 **digest-pinned** container artifacts (no floating `:dev`,
   `:latest`, `:stable`, or unqualified SHA tag): Platform API, ITSM, RMM,
   Admin, marketing/signup, deployment agent assets, certified release
   planner, stage executor, **protected host dispatcher**, PostgreSQL,
@@ -32,6 +32,33 @@ the host. The strict schema `hi5central-managed-restore-v1` requires:
 The check deliberately **does not** mean registry digests are retrievable,
 that image provenance is verified, or that DNS, builds and services work.
 Those must be added as separate real integration checks.
+
+## Newly implemented (staging only) — pinned cloud core
+
+The draft managed installer now contains `compose.managed-core.yml`,
+derived from the older cloud stack at
+`Hi5Central-Cloud@b4eb84434005586f0a69f03e955a88bf2e962a3e`.
+It has a separate marketing container, Caddy gateway, API, ITSM/Portal,
+RMM/Control, global Admin, PostgreSQL, Redis, coturn, agent assets and
+database migration step. With `compose.pgadmin-private.yml` it adds the
+private database browser. All launched images must be digest-pinned.
+
+The clean-install config-init does **not** preseed `test` or any customer
+hostname. Customer DNS routes must instead be added by a reviewed tenant
+provisioning gateway with tenant identity and stage approval checks.
+
+`scripts/render-managed-runtime.py` now combines the previously generated
+local private secret file with the complete approved immutable image manifest
+to produce `managed-runtime.env` (0600), without starting Docker. It
+refuses old tenant IDs, disabled global pause, mismatched image manifests,
+or secret overwrites. The entrypoint supports `--render-core --manifest`
+and `--verify-core-compose`; neither action deploys services.
+
+CI verifies the Compose rendering (actual Docker Compose parser), a
+distinct marketing route, private pgAdmin loopback, no published PostgreSQL,
+and no implicit customer DNS routes. This is **NOT proof of application
+startup, working signup, correct Caddy cutover, full platform migrations
+or secure generic worker deployment.** `--install` remains blocked.
 
 ## Known gaps in the existing source
 
