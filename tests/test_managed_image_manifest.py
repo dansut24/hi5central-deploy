@@ -22,7 +22,7 @@ def good_manifest():
   "pgadmin":"docker.io/dpage/pgadmin4@sha256:"+("1"*64),
  })
  native={k:{"status":"verified","url":"https://downloads.hi5central.com/verified/"+k,
-            "sha256":"7"*64,"platform_git_sha":sha}
+            "sha256":"7"*64,"source_git_sha":"9"*40}
           for k in m.NATIVE_NAMES}
  return {"schema":"hi5central-managed-restore-v1","deployment_kind":"managed_fresh",
          "platform_git_sha":sha,"tenant_seed_count":0,"release_rollout_paused":True,
@@ -59,9 +59,14 @@ class ManagedManifestTest(unittest.TestCase):
    m.validate(d)
  def test_native_build_mismatch_denied(self):
   d=good_manifest()
-  d["native_artifacts"]["macos_viewer"]["platform_git_sha"]="f"*40
-  with self.assertRaisesRegex(ValueError,"exact Platform SHA"):
+  d["native_artifacts"]["macos_viewer"]["source_git_sha"]="not-a-source-sha"
+  with self.assertRaisesRegex(ValueError,"own exact source SHA"):
    m.validate(d)
+ def test_native_independent_of_platform_sha(self):
+  d=good_manifest()
+  d["native_artifacts"]["windows_agent"]["source_git_sha"]="f"*40
+  d["native_artifacts"]["macos_viewer"]["source_git_sha"]="e"*40
+  self.assertTrue(m.validate(d)["validated_metadata_only"])
  def test_external_accounts_may_be_skipped(self):
   d=good_manifest()
   self.assertTrue(m.validate(d)["validated_metadata_only"])
