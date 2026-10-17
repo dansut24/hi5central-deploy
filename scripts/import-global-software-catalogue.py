@@ -94,8 +94,7 @@ DELETE FROM public.rmm_software_catalogue;
 CREATE TEMP TABLE hi5_import_seed(kind text NOT NULL, doc jsonb NOT NULL) ON COMMIT DROP;
 COPY hi5_import_seed(kind,doc) FROM STDIN WITH (FORMAT csv, DELIMITER E'\t');
 """
-SQL_END=r"""
-\.
+SQL_END=r"""\.
 DO $h5$
 DECLARE bad integer;
 BEGIN
