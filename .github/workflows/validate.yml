@@ -3,7 +3,7 @@ name: Validate Deployment
 on:
   workflow_dispatch:
   push:
-    branches: [main, develop]
+    branches: [main, develop, selfhost-guided-installer]
   pull_request:
 
 permissions:
@@ -14,37 +14,78 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
       - name: Check deployment shell syntax
         run: sh -n install.sh scripts/*.sh
-      - name: Validate Standard self-host bootstrap
+
+      - name: Validate Standard stable bootstrap
         env:
           HI5_ROOT_DOMAIN: ci.localhost
           HI5_EDITION: standard
           HI5_PRODUCTS: itsm,rmm
           HI5_SCHEME: http
+          HI5_RELEASE_CHANNEL: stable
           HI5_SKIP_PREFLIGHT: '1'
         run: |
           ./install.sh --http --configure-only --force
+          grep -q '^RELEASE_CHANNEL=stable$' .env
+          grep -q 'hi5central-platform-api:stable$' .env
           ! docker compose config --services | grep -qx admin-web
           ! docker compose config --services | grep -qx docs-web
-      - name: Validate MSP self-host bootstrap
+
+      - name: Validate Early Access bootstrap
+        env:
+          HI5_ROOT_DOMAIN: ci.localhost
+          HI5_EDITION: standard
+          HI5_PRODUCTS: rmm
+          HI5_SCHEME: http
+          HI5_RELEASE_CHANNEL: early-access
+          HI5_SKIP_PREFLIGHT: '1'
+        run: |
+          ./install.sh --http --configure-only --force
+          grep -q '^RELEASE_CHANNEL=early-access$' .env
+          grep -q 'hi5central-platform-api:early-access$' .env
+          docker compose config --services | grep -qx rmm-web
+          ! docker compose config --services | grep -qx itsm-web
+
+      - name: Validate manual-secret bootstrap
+        env:
+          HI5_ROOT_DOMAIN: ci.localhost
+          HI5_EDITION: standard
+          HI5_PRODUCTS: itsm
+          HI5_SCHEME: http
+          HI5_RELEASE_CHANNEL: stable
+          HI5_SECRET_MODE: manual
+          HI5_POSTGRES_PASSWORD: 'postgres-password-1234567890'
+          HI5_REDIS_PASSWORD: 'redis-password-123456789012'
+          HI5_MFA_ENCRYPTION_KEY: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+          HI5_RMM_RECOVERY_KEY_ENCRYPTION_KEY: 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+          HI5_CONNECT_CODE_HMAC_KEY: 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc'
+          HI5_TENANT_INSTALLER_HMAC_KEY: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd'
+          HI5_TURN_SHARED_SECRET: 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+          HI5_SKIP_PREFLIGHT: '1'
+        run: |
+          ./install.sh --http --configure-only --force
+          ./scripts/validate.sh
+          grep -q '^POSTGRES_PASSWORD=postgres-password-1234567890$' .env
+
+      - name: Validate MSP bootstrap
         env:
           HI5_ROOT_DOMAIN: ci.localhost
           HI5_EDITION: msp
           HI5_PRODUCTS: itsm,rmm
           HI5_SCHEME: http
+          HI5_RELEASE_CHANNEL: stable
           HI5_SKIP_PREFLIGHT: '1'
         run: |
           ./install.sh --http --configure-only --force
           docker compose config --services | grep -qx admin-web
           ! docker compose config --services | grep -qx docs-web
-      - name: Validate managed Dev, Test, UAT and Live profiles
+
+      - name: Reject latest for self-host
         run: |
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/dev.env.example config --services | grep -qx docs-web
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config --services | grep -qx admin-web
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config --services | grep -qx admin-web
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config --services | grep -qx docs-web
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/dev.env.example config | grep -q 'RUNTIME_ENVIRONMENT: dev'
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/test.env.example config | grep -q 'RUNTIME_ENVIRONMENT: test'
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/uat.env.example config | grep -q 'RUNTIME_ENVIRONMENT: uat'
-          docker compose -f compose.yml -f compose.managed-edge.yml --env-file environments/prod.env.example config | grep -q 'RUNTIME_ENVIRONMENT: live'
+          sed -i 's/:stable/:latest/g' .env
+          if ./scripts/validate.sh; then
+            echo 'Expected validation to reject :latest' >&2
+            exit 1
+          fi

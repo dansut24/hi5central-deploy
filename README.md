@@ -1,321 +1,276 @@
-# Hi5Central Deploy
+# Hi5Central Self-Hosted
 
-Public deployment surface for Hi5Central managed and self-hosted installations.
-
-Hi5Central application source code is maintained separately from this deployment repository. Self-hosters consume versioned runtime container images and signed native binaries; they do not need access to the application source repositories.
-
-> Containerisation is distribution, not perfect anti-reverse-engineering. Production images are built without the raw Control Server source tree, but any software delivered to a customer can ultimately be inspected. Repository access, licences, signing and build/release controls remain part of the protection model.
+This repository is the public deployment surface for Hi5Central. Application source remains in the private `Hi5Central-Platform` monorepo; self-hosters receive versioned container images, signed native applications and this deployment package.
 
 ## Editions
 
-### Self-Hosted Standard — free
+### Standard — free
 
-Standard is permanently free and does not require a licence key.
+For an organisation managing its own environment.
 
-It is intended for an organisation managing its own environment and installs:
+Includes:
 
-- PostgreSQL
-- Redis
-- Hi5Central Control Server / Hono API
-- ITSM + browser Self Service
+- ITSM
+- browser Self Service
 - RMM
+- PostgreSQL 17
+- Redis 8
+- Caddy
 - coturn
-- Caddy gateway
-- persistent Docker volumes and automatic migrations
+- persistent Docker volumes
+- database migrations
+- backup and restore tooling
 
-Platform Admin is not installed or routed in Standard, and the API reports the installation as edition=standard with single-organisation entitlements.
+Platform/MSP Admin is not enabled in Standard.
 
-### Self-Hosted MSP — paid
+### MSP — licensed
 
-MSP uses the same application images but enables licensed MSP capabilities through a signed entitlement:
+Uses the same runtime images with a signed MSP entitlement and enables:
 
 - multi-tenancy
-- MSP / Platform Admin
-- white-labelling entitlement
-- customer portals and custom-domain entitlement
+- Platform/MSP Admin
+- white-label entitlements
+- customer portal/custom-domain entitlements
 - licensed tenant/device/user limits
 
-A licence is bound to an installation ID. The installed Control Server verifies Hi5Central-signed entitlements locally and periodically refreshes them. Normal requests do not depend on the licensing service being online.
+The raw MSP key is used for activation and is not stored in `.env`.
 
-The raw licence key is used for activation and is not written to the deployment .env. After activation, the database holds the key hash, the signed entitlement and an installation-bound refresh credential.
+## Simple guided installation
 
-### Hi5Central Managed
+On a clean Linux VPS with Docker Engine and Docker Compose v2:
 
-Managed deployments are operated by Hi5Central and include Platform Admin/control-plane functionality. Managed Dev and Prod are separate Compose projects, data stores and image channels.
-
-## One-run self-host installation
-
-On a clean Linux host with Docker Engine and Docker Compose v2:
-
-~~~sh
+```sh
 git clone https://github.com/dansut24/hi5central-deploy.git
 cd hi5central-deploy
-./install.sh --domain example.com --email admin@example.com
-~~~
+./install.sh
+```
 
-That defaults to the free Standard edition. It installs ITSM and RMM and does **not** install Admin.
+The installer checks the host first, then asks only for the settings it needs.
 
-Explicitly:
+Typical Standard installation:
 
-~~~sh
-./install.sh \
-  --edition standard \
-  --domain example.com \
-  --email admin@example.com
-~~~
+```text
+Hi5Central Self-Hosted Setup
+============================
 
-To install only one product:
+Docker ............... OK
+Docker Compose ....... OK
+Memory ............... 8.0 GiB
+Disk free ............ 100.0 GiB
 
-~~~sh
-./install.sh --edition standard --domain example.com --products itsm
-~~~
+Installation type:
+  1) Standard - Free
+  2) MSP - Licensed
+Select [1]:
 
-For an internal/LAN deployment where TLS terminates elsewhere:
+Install:
+  1) ITSM + RMM
+  2) ITSM only
+  3) RMM only
+Select [1]:
 
-~~~sh
-./install.sh --edition standard --domain hi5.internal --http
-~~~
-## MSP installation
+Primary domain:
+> hi5.example.com
 
-A fresh MSP installation requires a Hi5Central MSP licence key:
+Use automatic HTTPS with Let's Encrypt? [Y/n]:
+Update channel:
+  1) Stable (recommended)
+  2) Early Access
+Select [1]:
 
-~~~sh
-./install.sh \
-  --edition msp \
-  --license-key 'hi5_msp_...' \
-  --domain msp.example.com \
-  --email admin@example.com
-~~~
+HTTP port [80]:
+HTTPS port [443]:
+TURN port [3478]:
+Use default TURN relay range 49160-49200? [Y/n]:
+Use advanced/custom hostnames? [y/N]:
+Configure SMTP now? [y/N]:
+Generate secure installation secrets automatically? [Y/n]:
 
-Interactive installs prompt for the key without echoing it. For automation, use HI5_LICENSE_KEY.
+Start installation? [Y/n]:
+```
 
-The installer starts the stack, waits for the API to become healthy and then activates the licence through /api/v1/system/license/activate. Existing licensed MSP installations can be restarted without supplying the original key because the refresh credential is already installation-bound.
+Pressing Enter accepts the recommended defaults.
 
-The MSP signing public key is supplied as deployment trust configuration. The corresponding private signing key exists only in the Hi5Central managed licensing authority and must never be distributed to self-host installations.
+## Secrets
 
-## What the installer does
+Automatic generation is the default and recommended option.
 
-A full installation:
+Hi5Central generates cryptographically random values for PostgreSQL, Redis, MFA encryption, RMM recovery encryption, Connect HMAC, tenant installer HMAC and TURN. The generated `.env` is written with restrictive permissions and secrets are not echoed to the terminal.
 
-1. validates Docker and Docker Compose;
-2. selects Standard or MSP;
-3. validates the selected ITSM/RMM products;
-4. generates PostgreSQL and Redis credentials;
-5. generates MFA, RMM recovery and Connect encryption/HMAC material;
-6. generates the coturn shared secret and runtime gateway configuration;
-7. writes a mode-600 .env;
-8. validates the Compose model and runs preflight;
-9. pulls the configured Hi5Central runtime images;
-10. starts isolated PostgreSQL and Redis services;
-11. applies every database migration;
-12. starts Control Server, selected web apps, coturn and Caddy;
-13. waits for application health checks;
-14. activates or verifies the MSP licence when required;
-15. verifies database state and prints the resulting URLs.
+If you want to provide secrets yourself, answer **No** to automatic secret generation or use:
 
-No external PostgreSQL or Redis installation is required.
+```sh
+HI5_SECRET_MODE=manual \
+HI5_POSTGRES_PASSWORD='...' \
+HI5_REDIS_PASSWORD='...' \
+HI5_MFA_ENCRYPTION_KEY='64-hex-characters...' \
+HI5_RMM_RECOVERY_KEY_ENCRYPTION_KEY='64-hex-characters...' \
+HI5_CONNECT_CODE_HMAC_KEY='64-hex-characters...' \
+HI5_TENANT_INSTALLER_HMAC_KEY='64-hex-characters...' \
+HI5_TURN_SHARED_SECRET='64-hex-characters...' \
+./install.sh --domain hi5.example.com
+```
 
-Use --configure-only to create and validate configuration without starting containers.
+This allows secrets to come from a password manager, provisioning system or other secret-management workflow.
 
-### Non-interactive Standard
+## Domains
 
-~~~sh
+A single base domain is enough.
+
+For `hi5.example.com`, defaults are derived automatically:
+
+- `itsm.hi5.example.com`
+- `rmm.hi5.example.com`
+- `api.hi5.example.com`
+- `downloads.hi5.example.com`
+- `turn.hi5.example.com`
+- `admin.hi5.example.com` for MSP only
+
+Choose advanced/custom hostnames during setup if these defaults do not suit the environment.
+
+## Ports
+
+Defaults:
+
+- TCP 80 — HTTP / ACME redirect
+- TCP/UDP 443 — HTTPS / HTTP3
+- TCP/UDP 3478 — TURN
+- UDP 49160-49200 — TURN relay range
+
+The preflight checks required host ports on a fresh installation and stops before container startup if a conflict is detected.
+
+All main ports can be overridden interactively or with `HI5_*` environment variables.
+
+## HTTPS
+
+Automatic HTTPS through Caddy is the normal public deployment.
+
+For an internal/LAN deployment, or when TLS is terminated elsewhere:
+
+```sh
+./install.sh --domain hi5.internal --http
+```
+
+## Release channels
+
+Self-host installations never consume development or production images directly.
+
+Two self-host channels are supported:
+
+- **Stable** — recommended/default; only explicitly published, production-verified releases.
+- **Early Access** — optional release candidates for customers who choose to test ahead of Stable.
+
+The installer writes the selected channel into `.env`. The deployment validator rejects `:latest` for self-hosted platform images.
+
+Internal Hi5Central flow:
+
+```text
+feature / PR
+    ↓
+Development
+    ↓
+tested
+    ↓
+Production
+    ↓
+production smoke checks
+    ↓
+explicit Publish Self-Hosted Release
+    ├── stable
+    └── early-access
+```
+
+A Production deployment does **not** automatically publish a self-host release.
+
+## Updating
+
+Run:
+
+```sh
+./scripts/update.sh
+```
+
+The updater:
+
+1. validates configuration;
+2. creates a pre-update application backup when PostgreSQL is running;
+3. pulls the approved selected release channel;
+4. applies database migrations;
+5. recreates changed services;
+6. waits for core services to become healthy;
+7. prunes unused image layers.
+
+Set `HI5_SKIP_UPDATE_BACKUP=1` only when an equivalent external backup has already been taken.
+
+## Backup and restore
+
+Create a backup:
+
+```sh
+./backup.sh
+```
+
+Restore:
+
+```sh
+./restore.sh backups/hi5central-backup-YYYYMMDDTHHMMSSZ.tar.gz
+```
+
+Backup archives contain `.env` and therefore contain secrets. Store them as sensitive material.
+
+## Non-interactive installation
+
+Standard:
+
+```sh
 HI5_ROOT_DOMAIN=hi5.example.com \
-HI5_ACME_EMAIL=admin@example.com \
 HI5_EDITION=standard \
 HI5_PRODUCTS=itsm,rmm \
+HI5_RELEASE_CHANNEL=stable \
 ./install.sh
-~~~
+```
 
-### Non-interactive MSP
+MSP:
 
-~~~sh
+```sh
 HI5_ROOT_DOMAIN=msp.example.com \
-HI5_ACME_EMAIL=admin@example.com \
 HI5_EDITION=msp \
 HI5_LICENSE_KEY='hi5_msp_...' \
 HI5_PRODUCTS=itsm,rmm \
+HI5_RELEASE_CHANNEL=stable \
 ./install.sh
-~~~
+```
 
-Advanced image, SMTP, Microsoft identity, networking and licensing settings can be supplied through the HI5_* variables documented by ./install.sh --help and scripts/install.sh.
-## DNS and firewall
+Use `./install.sh --help` for command-line options.
 
-Standard self-hosting normally uses:
+## Configure without starting
 
-- itsm.<domain>
-- rmm.<domain>
-- api.<domain>
-- downloads.<domain>
-- turn.<domain>
+```sh
+./install.sh --configure-only
+```
 
-MSP additionally uses:
+This generates and validates configuration without pulling or starting application containers.
 
-- admin.<domain>
+## Existing installation commands
 
-Allow TCP 80/443, TURN TCP/UDP 3478 and UDP 49160-49200 as appropriate for the host/network design.
+- `./scripts/up.sh` — validate, pull and start.
+- `./scripts/update.sh` — backup, update and health-check.
+- `./scripts/down.sh` — stop without deleting persistent volumes.
+- `./scripts/validate.sh` — validate secrets, release channel and Compose.
+- `./preflight.sh` — host/resource/DNS/port checks.
+- `./backup.sh` — application-aware backup.
+- `./restore.sh <archive>` — restore a protected backup.
 
-The gateway and TURN host ports are configurable with GATEWAY_HTTP_PORT, GATEWAY_HTTPS_PORT, TURN_LISTEN_PORT, TURN_RELAY_MIN_PORT and TURN_RELAY_MAX_PORT.
+## Testing a candidate release on a second VPS
 
-## Managed Dev / Prod separation
+A clean second VPS is the preferred acceptance environment because it behaves like a real new customer's server and cannot accidentally depend on the existing Hi5Central host.
 
-Hi5Central development is intentionally separate from production.
+See `docs/SECOND_VPS_ACCEPTANCE.md` for the full acceptance checklist.
 
-Image channels:
+## Repository boundary
 
-- develop branch → :dev
-- main branch → :prod and :latest
-- release tags → versioned image tags
-- every branch build also receives an immutable SHA tag
+`Hi5Central-Platform` is the private canonical product monorepo.
 
-Managed environment templates live under:
+`hi5central-deploy` is intentionally separate and public. It contains only the deployment surface required by self-host customers: Compose, gateway configuration, install/update/backup/restore tooling and documentation.
 
-~~~text
-environments/dev.env.example
-environments/test.env.example
-environments/uat.env.example
-environments/prod.env.example
-~~~
-
-The four environments have deliberately different responsibilities:
-
-| Environment | Feature mode | Data | Image policy |
-| --- | --- | --- | --- |
-| Dev | all enabled | development | follows `:dev` |
-| Test | all enabled | disposable test data | follows `:dev`; resettable |
-| UAT | controlled | release-cycle test data | exact Test image digests |
-| Live | controlled | production | exact UAT-tested image digests |
-
-Create private runtime files from the templates and replace all placeholder secrets before startup. Real environment files are ignored by Git.
-
-Use:
-
-~~~sh
-./scripts/environment.sh dev up
-./scripts/environment.sh test up
-./scripts/environment.sh uat up
-./scripts/environment.sh prod update
-~~~
-
-Every environment uses a different `COMPOSE_PROJECT_NAME`, PostgreSQL/Redis volume set, private Docker network, gateway name and host/TURN port range.
-
-Managed environments also load `compose.managed-edge.yml`. This joins only the managed gateway to the existing edge Docker network while application, PostgreSQL and Redis services remain isolated on the environment's private network.
-
-### Release and promotion model
-
-~~~text
-feature work
-    ↓
-develop / :dev
-    ↓
-Dev integration
-    ↓
-Test — all registered features ON
-    │     disposable data / Reset button
-    │
-    ├── Test result: Pass / Fail / Blocked
-    ↓
-select passed changes
-    ↓
-UAT — controlled feature switches
-    │     exact Test image digests
-    │
-    ├── UAT result: Pass / Fail / Blocked
-    ↓
-tick UAT-passed feature-gated changes
-    ↓
-Push selected to Live
-    ↓
-Live — exact UAT image digests + selected flags ON
-~~~
-
-Release changes, test evidence, feature switches and promotion requests are stored in the managed Platform Admin control plane. Test must pass before UAT evidence is accepted. UAT must pass before a change can be selected for Live.
-
-Selective Live promotion requires a registered feature flag. This is intentional: an unselected change may exist inside the same immutable candidate image, but it remains dormant until its Live feature switch is explicitly promoted.
-
-The Hono API never receives the Docker socket. It only queues validated environment actions. A separate Hi5Central Release Operator claims those actions, resets the disposable Test project, captures exact registry digests from Test/UAT and deploys the target environment. Live execution is additionally blocked unless the operator is started with `LIVE_PROMOTION_ENABLED=1`.
-
-Install the operator against the current managed control plane with:
-
-~~~sh
-./scripts/install-release-operator.sh dev
-~~~
-
-After the new managed Live control plane is cut over, reinstall it against Live with:
-
-~~~sh
-./scripts/install-release-operator.sh prod
-~~~
-
-The installer copies `test.env`, `uat.env`, the optional `prod.env`, and the operator credential into a dedicated Docker volume with restrictive permissions. The operator container alone receives the Docker socket. Before cutover, Live promotion remains disabled. At the controlled cutover, use `HI5_ENABLE_LIVE_PROMOTION=1` when reinstalling the operator.
-
-Production is never updated directly from a mutable `:dev` image.
-
-## Preflight
-
-Run the non-destructive preflight:
-
-~~~sh
-./preflight.sh
-~~~
-
-For strict public DNS validation:
-
-~~~sh
-./preflight.sh --strict-dns --public-ip 203.0.113.10
-~~~
-
-The installer runs preflight automatically before startup. HI5_SKIP_PREFLIGHT=1 is intended only for controlled automation/CI where equivalent checks run elsewhere.
-## Backup and restore
-
-Create an application-aware backup:
-
-~~~sh
-./backup.sh
-~~~
-
-The protected archive under backups/ contains deployment configuration, a PostgreSQL logical dump and persistent Redis/download/App Portal/Caddy volume data. Treat it as a secret.
-
-Restore with:
-
-~~~sh
-./restore.sh backups/hi5central-backup-YYYYMMDDTHHMMSSZ.tar.gz
-~~~
-
-Interactive restore requires typing RESTORE; automation can use --yes.
-
-## Existing installations
-
-- ./scripts/up.sh validates and starts the configured self-host stack.
-- ./scripts/update.sh pulls configured images and recreates services.
-- ./scripts/down.sh stops the stack without deleting persistent volumes.
-- ./scripts/validate.sh validates secrets and Compose configuration.
-- ./preflight.sh validates Docker, resources, DNS and configuration.
-- ./backup.sh creates a protected application backup.
-- ./restore.sh <archive> restores a backup.
-- ./scripts/environment.sh <dev|prod> ... operates Hi5Central managed environments.
-
-Back up .env and persistent volumes before upgrades.
-
-## Disposable integration testing
-
-./scripts/smoke-local.sh creates a disposable Compose project with fresh PostgreSQL and Redis volumes, applies every migration, starts the application services, verifies health/schema and removes the test stack afterward.
-
-The deployment CI separately validates that Standard does not include admin-web and that MSP does.
-
-## Source and artifact model
-
-Recommended repository visibility:
-
-- hi5central-control-server — **private**
-- hi5central-itsm — **private**
-- hi5central-rmm — **private**
-- hi5central-admin — **private**
-- hi5central-deploy — public
-- native Agent/Viewer/App Portal source — private unless intentionally released otherwise
-
-Runtime images intended for free self-hosting can be publicly pullable GHCR packages independently of source repository visibility.
-
-The Control Server image is built as a multi-stage image. Raw /src is not copied into the runtime image; only the bundled/minified runtime, production dependencies and SQL migrations are distributed. Front-end containers similarly ship built browser assets rather than their source trees.
-
-See `docs/README.md` for the documentation map and `PUBLISHING.md` for the canonical repository and artifact map.
+Container distribution does not make delivered software impossible to inspect; repository access, signed artifacts, licensing and release controls remain part of the protection model.
