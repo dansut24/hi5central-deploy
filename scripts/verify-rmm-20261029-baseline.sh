@@ -4,6 +4,8 @@
 set -Eeuo pipefail
 
 want_web='sha256:b01463acf22bc3952e357eaf43fdec275016ace019bd219fc1d84694a2b49d22'
+# Approved UI-only overlay from Platform PR #160; viewer files remain pinned.
+allowed_inventory_ui_web='sha256:defad69f0c6dc7fe22957298640123575febbe0a74541bb50aac710abdee3ee9'
 want_api='sha256:9542d8537f8a003c2230aa17ff06b56f6ffed605740bb9952ea0b6ba54210f45'
 want_viewer_html='a233420273a482f7c4d45d8e7f3e34d489ba794e0f19af587e3a9b1fe9ff2281'
 want_viewer_js='1e61ef9e80a00dc2d9428269c76a01462cbc575826bf026ff39ee739387258d6'
@@ -21,7 +23,14 @@ check() {
 failed=0
 web_id="$(docker inspect hi5central-rmm-web-1 --format '{{.Image}}')"
 api_id="$(docker inspect hi5central-rmm-api-1 --format '{{.Image}}')"
-check web-image "$web_id" "$want_web" || failed=1
+if [[ "$web_id" == "$want_web" ]]; then
+  echo "OK    web-image            $web_id (original protected release)"
+elif [[ "$web_id" == "$allowed_inventory_ui_web" ]]; then
+  echo "OK    web-image            $web_id (approved inventory UI overlay)"
+else
+  printf 'DRIFT web-image            %s not on approved list\n' "$web_id" >&2
+  failed=1
+fi
 check api-image "$api_id" "$want_api" || failed=1
 while read -r hash path; do
   case "$path" in
