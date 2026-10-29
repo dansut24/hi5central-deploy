@@ -8,7 +8,7 @@ want_api='sha256:9542d8537f8a003c2230aa17ff06b56f6ffed605740bb9952ea0b6ba54210f4
 want_viewer_html='a233420273a482f7c4d45d8e7f3e34d489ba794e0f19af587e3a9b1fe9ff2281'
 want_viewer_js='1e61ef9e80a00dc2d9428269c76a01462cbc575826bf026ff39ee739387258d6'
 want_agent='87baf2cd6d97826392b0dc757e1a5b19c3fd7aabe657dfa30dc5661d0513dc76'
-installer='${H5C_AGENT_INSTALLER:-/opt/hi5central/runtime/rmm/shared/privileged-input-pr78-20261029/Hi5CentralAgentSetup-1.0.130.exe}'
+installer="${H5C_AGENT_INSTALLER:-/opt/hi5central/runtime/rmm/shared/privileged-input-pr78-20261029/Hi5CentralAgentSetup-1.0.130.exe}"
 
 check() {
   local name="$1" actual="$2" expected="$3"
