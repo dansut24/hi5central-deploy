@@ -1,0 +1,40 @@
+name: Hi5Central External Uptime Checks
+# Runs on GitHub-hosted infrastructure, separately from the production VPS.
+# Email notifications for failed runs depend on GitHub account notification settings.
+on:
+  push:
+    paths:
+      - .github/workflows/external-uptime.yml
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+permissions:
+  contents: read
+jobs:
+  check-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Check public status, ITSM, RMM and API
+        shell: bash
+        run: |
+          set -euo pipefail
+          urls=(
+            "https://status.hi5central.com/"
+            "https://status.hi5central.com/data/metrics.json"
+            "https://hi5central.com/healthz"
+            "https://api.hi5central.com/health"
+            "https://admin.hi5central.com/healthz"
+            "https://rmm.hi5central.com/healthz"
+            "https://rmm.hi5central.com/health"
+          )
+          failed=0
+          for url in "${urls[@]}"; do
+            status="$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' --max-time 18 --retry 2 --retry-delay 3 --retry-connrefused "$url")" || status="000"
+            echo "$status $url"
+            if [[ "$status" != "200" ]]; then
+              echo "::error title=External availability check failed::$url returned $status"
+              failed=1
+            fi
+          done
+          exit "$failed"
