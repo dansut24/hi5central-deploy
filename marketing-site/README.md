@@ -25,7 +25,7 @@ Deploy only to the **original** VPS \`ubuntu\`; do not use the EU environment.
 - Private review at \`https://hi5central.com/contact-inbox\` with the **QA portal's Basic Auth**.
 - Staff must manually review the inbox. No email or push notification is claimed.
 - Live database prunes enquiries older than 90 days on application start. Backups may have different retention.
-- Separate online SQLite snapshots/backups required before treating form as fully disaster-recovery ready.
+- The original VPS has a root-only online SQLite backup script at `/usr/local/sbin/hi5central-marketing-contact-backup`, scheduled daily at 03:05 UTC via `/etc/cron.d/hi5central-marketing-contact-backup`. Source is `marketing-site/backup.py`. It prunes live enquiries older than 90 days, verifies the snapshot with SQLite integrity checks and retains 30 days of **local** backups in `/opt/hi5central/recovery/marketing-contact`. Off-server encrypted backup and full restore are still pending.
 - Do not enter passwords, secrets or sensitive ticket/customer data.
 
 ## Production verification
@@ -38,3 +38,14 @@ Deploy only to the **original** VPS \`ubuntu\`; do not use the EU environment.
 
 ## Security
 This is an internal small-team system, not a CRM. Migrate to proper individual Admin SSO, approved outbound email and a full privacy policy before opening broad customer acquisition.
+
+## Verified on original VPS — 13 November 2026
+
+- All six marketing pages serve valid HTML with distinct title and canonical URL.
+- Public navigation/link sweep: 12 unique local/status targets, zero failures; both hi5central.com and www verified.
+- System dark-mode CSS, manual-theme script and mobile menu JavaScript present and syntax-checked; physical iPhone visual check outstanding.
+- Contact form saved a controlled test enquiry, confirmed the server database record, then removed the test entry. Anonymous contact inbox returned 401.
+- Existing /signup HTML hash was identical before and after Caddy routing. /api/v1/catalogue continued returning expected anonymous 401.
+- Daily contact database backup script passed its first run with SQLite integrity validation.
+- Automated smoke workflow: https://github.com/dansut24/hi5central-deploy/actions/runs/43490716184 (success).
+- QA tracker: MKT-002 and MKT-011 Passed; MKT-001 In progress pending real mobile dark-mode visual acceptance.
