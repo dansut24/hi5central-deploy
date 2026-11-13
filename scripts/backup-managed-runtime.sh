@@ -25,7 +25,7 @@ if [[ "$status" != "healthy" ]]; then
   exit 1
 fi
 work="$(mktemp -d "$root/.pending-XXXXXXXX")"
-cleanup() { if [[ -n "\${work:-}" && -d "$work" ]]; then rm -rf -- "$work"; fi; }
+cleanup() { if [[ -n "$work" && -d "$work" ]]; then rm -rf -- "$work"; fi; }
 trap cleanup EXIT
 
 for db in hi5central hi5central_dev hi5central_test hi5central_uat; do
