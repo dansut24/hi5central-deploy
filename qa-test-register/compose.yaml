@@ -1,0 +1,33 @@
+services:
+  qa-test-register:
+    image: python:3.13-alpine
+    container_name: hi5central-qa-test-register
+    restart: unless-stopped
+    user: "10001:10001"
+    command: ["python", "-u", "/app/server.py"]
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=16m
+    volumes:
+      - ./app:/app:ro
+      - ./data:/data:rw
+    environment:
+      QA_TRACKER_DB: /data/tests.sqlite3
+      QA_TRACKER_ORIGIN: https://tests.hi5central.com
+      PYTHONDONTWRITEBYTECODE: "1"
+    expose:
+      - "8080"
+    networks:
+      - hi5central-internal
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/api/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+networks:
+  hi5central-internal:
+    external: true
