@@ -1,0 +1,28 @@
+name: Hi5Central Marketing Pages CI
+on:
+  push:
+    paths:
+      - 'marketing-site/**'
+      - '.github/workflows/marketing-pages-smoke.yml'
+  pull_request:
+    paths:
+      - 'marketing-site/**'
+      - '.github/workflows/marketing-pages-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  marketing-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Python and JavaScript syntax
+        run: |
+          python3 -m py_compile marketing-site/app/server.py marketing-site/backup.py
+          node --check marketing-site/app/app.js
+      - name: Run marketing page, route and contact tests
+        run: python3 -m unittest discover -s marketing-site/tests -v
