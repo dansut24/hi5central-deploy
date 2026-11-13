@@ -1,0 +1,25 @@
+name: Managed runtime backup script validation
+on:
+  push:
+    paths:
+      - 'scripts/backup-managed-runtime.sh'
+      - '.github/workflows/managed-runtime-backup-script.yml'
+  pull_request:
+    paths:
+      - 'scripts/backup-managed-runtime.sh'
+      - '.github/workflows/managed-runtime-backup-script.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash -n scripts/backup-managed-runtime.sh
+      - name: Validate safety invariants
+        run: |
+          grep -q 'flock -n' scripts/backup-managed-runtime.sh
+          grep -q 'pg_restore --list' scripts/backup-managed-runtime.sh
+          grep -q 'sha256sum -c' scripts/backup-managed-runtime.sh
+          grep -q 'hi5central_uat' scripts/backup-managed-runtime.sh
