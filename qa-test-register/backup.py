@@ -33,6 +33,8 @@ with (ROOT/".backup.lock").open("w") as lock:
         print("BACKUP_COMPLETE "+str(final)+" tests="+str(count)+" sha256="+digest,flush=True)
     finally:
         staging.unlink(missing_ok=True)
+        Path(str(staging)+"-wal").unlink(missing_ok=True)
+        Path(str(staging)+"-shm").unlink(missing_ok=True)
     cutoff=datetime.now(timezone.utc)-timedelta(days=30)
     for item in ROOT.glob("qa-register-*.sqlite3"):
         try:
