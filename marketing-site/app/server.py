@@ -10,12 +10,13 @@ from datetime import datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
+from showcase import home as showcase_home, product as showcase_product, insert_pricing, insert_about
 
 APP=Path(__file__).resolve().parent
 DATABASE=Path(os.getenv("MARKETING_CONTACT_DB","/data/contact.sqlite3"))
 ORIGINS={"https://hi5central.com","https://www.hi5central.com"}
 PAGES={"":("Hi5Central | Connected ITSM and RMM","IT service management and remote monitoring together, or separately.","Home"),
-       "products":("Products | Hi5Central","Explore Hi5Central ITSM, RMM, Connect, software deployment and self-service.","Products"),
+       "products":("Products | Hi5Central","Explore Hi5Central ITSM, RMM, remote support and connected service workflows.","Products"),
        "pricing":("Pricing | Hi5Central","Choose ITSM, RMM or both. Contact Hi5Central for current product pricing.","Pricing"),
        "about":("About | Hi5Central","Why we're building Hi5Central: clear service workflows and dependable endpoint operations.","About"),
        "contact":("Contact | Hi5Central","Contact the Hi5Central team with product, pricing and implementation enquiries.","Contact"),
@@ -160,8 +161,11 @@ def privacy_page():
       '<h2>Retention and access</h2><p>Enquiries are stored in an access-restricted system on our original server and are automatically deleted after 90 days from the live enquiry database. A small internal team can review them. Separately retained backups may remain longer according to backup schedules.</p>'
       '<h2>Important information</h2><p>Do not send passwords, authentication codes or highly sensitive customer information through this form. You can ask about your message through the contact page.</p></div></section>')
 def page_content(key,sent=False):
-    return {"":homepage,"products":product_page,"pricing":pricing_page,"about":about_page,
-            "contact":lambda:contact_page(sent),"privacy":privacy_page}[key]()
+    if key == "": return showcase_home()
+    if key == "products": return showcase_product()
+    if key == "pricing": return insert_pricing(pricing_page())
+    if key == "about": return insert_about(about_page())
+    return {"contact":lambda:contact_page(sent),"privacy":privacy_page}[key]()
 def render(key,sent=False):
     title,desc,_=PAGES[key]
     path="/"+key
@@ -177,6 +181,7 @@ def render(key,sent=False):
      '<meta property="og:url" content="'+esc(canonical)+'">'
      '<link rel="icon" href="/favicon.svg" type="image/svg+xml">'
      '<link rel="stylesheet" href="/_site/styles.css">'
+     '<link rel="stylesheet" href="/_site/showcase.css">'
      '<script defer src="/_site/app.js"></script></head><body>'
      +header(path)+'<main id="main">'+page_content(key,sent)+'</main>'+footer()+'</body></html>')
 class App(BaseHTTPRequestHandler):
@@ -200,6 +205,14 @@ class App(BaseHTTPRequestHandler):
         s=urlsplit(self.path);path=s.path
         if path=="/healthz":return self.send(200,"ok","text/plain")
         if path=="/_site/styles.css":return self.send(200,(APP/"styles.css").read_bytes(),"text/css; charset=utf-8")
+        if path=="/_site/showcase.css":return self.send(200,(APP/"showcase.css").read_bytes(),"text/css; charset=utf-8")
+        if path.startswith("/_site/images/"):
+            allowed={"hi5central-platform.webp","hi5central-itsm.webp","hi5central-rmm.webp"}
+            filename=path[len("/_site/images/"):]
+            if filename not in allowed:return self.send(404,"Image not found","text/plain")
+            imagefile=APP/"images"/filename
+            if not imagefile.is_file():return self.send(404,"Image unavailable","text/plain")
+            return self.send(200,imagefile.read_bytes(),"image/webp")
         if path=="/_site/app.js":return self.send(200,(APP/"app.js").read_bytes(),"application/javascript; charset=utf-8")
         if path=="/robots.txt":return self.send(200,"User-agent: *\nAllow: /\nSitemap: https://hi5central.com/sitemap.xml\n","text/plain")
         if path=="/sitemap.xml":
