@@ -1,4 +1,5 @@
 import importlib.util
+import sys
 import json
 import sqlite3
 import tempfile
@@ -11,6 +12,7 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 
 root=Path(__file__).resolve().parents[1]/"app"
+sys.path.insert(0,str(root))
 spec=importlib.util.spec_from_file_location("marketing_app",root/"server.py")
 marketing=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(marketing)
