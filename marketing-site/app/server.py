@@ -207,12 +207,12 @@ class App(BaseHTTPRequestHandler):
         if path=="/_site/styles.css":return self.send(200,(APP/"styles.css").read_bytes(),"text/css; charset=utf-8")
         if path=="/_site/showcase.css":return self.send(200,(APP/"showcase.css").read_bytes(),"text/css; charset=utf-8")
         if path.startswith("/_site/images/"):
-            allowed={"hi5central-platform.webp","hi5central-itsm.webp","hi5central-rmm.webp"}
+            allowed={"hi5central-platform.png","hi5central-itsm.png","hi5central-rmm.png"}
             filename=path[len("/_site/images/"):]
             if filename not in allowed:return self.send(404,"Image not found","text/plain")
             imagefile=APP/"images"/filename
             if not imagefile.is_file():return self.send(404,"Image unavailable","text/plain")
-            return self.send(200,imagefile.read_bytes(),"image/webp")
+            return self.send(200,imagefile.read_bytes(),"image/png")
         if path=="/_site/app.js":return self.send(200,(APP/"app.js").read_bytes(),"application/javascript; charset=utf-8")
         if path=="/robots.txt":return self.send(200,"User-agent: *\nAllow: /\nSitemap: https://hi5central.com/sitemap.xml\n","text/plain")
         if path=="/sitemap.xml":
