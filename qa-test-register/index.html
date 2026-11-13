@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101e38">
+  <title>Hi5Central | Production Readiness</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand"><span class="brandmark">H<span>5</span></span><div><strong>Hi5Central</strong><small>Production Readiness</small></div></div>
+    <div class="header-right"><span class="internal-tag"><span class="dot"></span> Internal QA</span><a class="btn light export-link" href="/api/export.csv">Export CSV</a><a class="btn light export-link" href="/api/export.json">Export JSON</a></div>
+  </header>
+  <div class="workspace" id="workspace">
+    <aside class="sidebar">
+      <div class="sidebar-title"><span>PRODUCT AREAS</span><small id="area-count">17</small></div>
+      <nav aria-label="Product areas" id="areas"><div class="skeleton">Loading products…</div></nav>
+      <div class="sidebar-foot"><strong>Saved on the server</strong><p>All changes are retained and appear across your devices. Each update has a revision history.</p><span class="secure-line">HTTPS · access protected</span></div>
+    </aside>
+    <main class="main">
+      <div class="heading"><div><div class="eyebrow">HI5CENTRAL / QUALITY ASSURANCE</div><h1>Production readiness</h1><p>Run checks one by one, record evidence and track everything to sign-off.</p></div><div class="heading-pulse" id="sync-status">Live register</div></div>
+      <section class="kpis" aria-label="Progress overview">
+        <div class="kpi"><span>Total checks</span><strong id="count-total">—</strong><small>Across all products</small></div>
+        <div class="kpi"><span>Passed</span><strong class="good" id="count-pass">—</strong><small>Signed off with evidence</small></div>
+        <div class="kpi"><span>Failed / blocked</span><strong class="warn" id="count-problem">—</strong><small>Require action</small></div>
+        <div class="kpi"><span>Outstanding</span><strong id="count-open">—</strong><small>Not run or in progress</small></div>
+      </section>
+      <section class="progress-panel"><div class="progress-heading"><strong>Testing progress</strong><span id="progress-label">0 of 218</span></div><div class="progress-track"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div><p>Previous smoke checks are recorded separately from full passes. A status change here never runs tests automatically.</p></section>
+      <div class="list-heading"><div><h2 id="list-title">All test cases</h2><span id="list-meta">Loading…</span></div><button id="next-open" type="button" class="btn primary">Next untested <span aria-hidden="true">→</span></button></div>
+      <section class="filters" aria-label="Filter tests">
+        <label class="search-control"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Search ID, feature, steps or evidence" autocomplete="off"><kbd>/</kbd></label>
+        <select id="status-filter" aria-label="Filter by status"><option value="">Any status</option><option>Not run</option><option>In progress</option><option>Pass</option><option>Fail</option><option>Blocked</option><option>Smoke checked</option></select>
+        <select id="priority-filter" aria-label="Filter by priority"><option value="">Any priority</option><option>P0</option><option>P1</option></select>
+        <select id="method-filter" aria-label="Filter by test method"><option value="">Any method</option><option>Manual</option><option>Hardware</option><option>Automated</option></select>
+      </section>
+      <div class="table-wrap">
+        <table aria-label="Production readiness test cases"><thead><tr><th>TEST</th><th>FEATURE</th><th>PRIORITY</th><th>METHOD</th><th>STATUS</th><th></th></tr></thead><tbody id="test-list"><tr><td colspan="6">Loading test register…</td></tr></tbody></table>
+        <div id="empty" class="empty" hidden>No tests match these filters.</div>
+      </div>
+      <footer class="page-footer">Hi5Central Internal QA · Data stored on the original VPS · Scope: all 218 baseline tests</footer>
+    </main>
+    <aside id="detail" class="detail-panel" hidden aria-label="Test details">
+      <div id="detail-inner"></div>
+    </aside>
+  </div>
+  <div class="toast" role="status" id="toast" hidden></div>
+</body>
+</html>
