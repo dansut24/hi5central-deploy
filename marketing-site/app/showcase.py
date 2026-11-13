@@ -7,9 +7,9 @@ def button(path, label, primary=True):
 NOTICE = "AI-enhanced illustrative product visual. Screens and metrics shown are examples, not live customer data."
 
 def image(name,alt,kind="image",priority=False):
-    src="/_site/images/hi5central-"+name+".webp"
+    src="/_site/images/hi5central-"+name+".png"
     return ('<figure class="show-figure '+kind+'">'
-            '<img src="'+src+'" width="1024" height="576" alt="'+_escape(alt)+'" '
+            '<img src="'+src+'" width="199" height="112" alt="'+_escape(alt)+'" '
             +('loading="eager" fetchpriority="high"' if priority else 'loading="lazy"')
             +' decoding="async">'
             '<figcaption>'+NOTICE+'</figcaption></figure>')
